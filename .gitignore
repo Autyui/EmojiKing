@@ -1,0 +1,40 @@
+# Android Studio / IntelliJ IDEA
+*.iml
+.idea/
+
+# Gradle and generated build output
+.gradle/
+.kotlin/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+/app/release/
+
+# Machine-local SDK, signing, and service configuration
+local.properties
+*.jks
+*.keystore
+*.p12
+*.pfx
+keystore.properties
+signing.properties
+secrets.properties
+github.properties
+.env
+.env.*
+!.env.example
+
+# JVM and operating-system artifacts
+hs_err_pid*
+*.hprof
+.DS_Store
+Thumbs.db
+
+预览图.png
+TODO

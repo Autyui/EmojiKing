@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">本地表情输入法原型</string>
+    <string name="ime_name">本地表情输入法</string>
+    <string name="ime_subtype">中文</string>
+</resources>
