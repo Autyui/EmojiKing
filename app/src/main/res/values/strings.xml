@@ -2,4 +2,11 @@
     <string name="app_name">本地表情输入法原型</string>
     <string name="ime_name">本地表情输入法</string>
     <string name="ime_subtype">中文</string>
+    <string name="local_receive_success">本地链路通过：已接收并读取 %1$s</string>
+    <string name="local_receive_failure">本地链路失败：%1$s</string>
+    <string name="ime_mime_supported">支持 %1$s；点击图片将直接提交</string>
+    <string name="ime_mime_unsupported">不支持 %1$s；点击图片将打开当前应用分享</string>
+    <string name="catalog_load_failure">表情库读取失败：%1$s</string>
+    <string name="catalog_empty_status">%1$s · 0 个表情包</string>
+    <string name="catalog_pack_status">%1$s · %2$s · %3$d 张</string>
 </resources>
