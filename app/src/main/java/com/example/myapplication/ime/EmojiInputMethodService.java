@@ -35,6 +35,9 @@ import java.util.List;
 
 /** Multi-gallery emoji panel that preserves the standard commit/share policy. */
 public class EmojiInputMethodService extends InputMethodService {
+    private static final int CANDIDATE_LIMIT = 8;
+
+    private LinearLayout contentContainer;
     private LinearLayout galleryRail;
     private LinearLayout packStrip;
     private EmojiGridAdapter gridAdapter;
@@ -44,6 +47,12 @@ public class EmojiInputMethodService extends InputMethodService {
     private String selectedGalleryId;
     private String selectedPackId;
     private String selectedItemId;
+    private boolean textMode = true;
+    private boolean englishMode;
+    private final StringBuilder pinyinBuffer = new StringBuilder();
+    private LinearLayout candidateStrip;
+    private TextView composingLabel;
+    private PinyinDictionary pinyinDictionary;
 
     @Override
     public boolean onEvaluateInputViewShown() {
@@ -54,10 +63,62 @@ public class EmojiInputMethodService extends InputMethodService {
     @Override
     public View onCreateInputView() {
         LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.HORIZONTAL);
+        root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(surfaceColor());
         root.setPadding(dp(4), dp(4), dp(4), dp(4));
-        root.setMinimumHeight(dp(300));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = label("EmojiKing", 13);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        Button switchMode = button("", "切换输入模式", view -> {
+            InputConnection connection = getCurrentInputConnection();
+            if (connection != null) {
+                connection.finishComposingText();
+            }
+            textMode = !textMode;
+            englishMode = false;
+            pinyinBuffer.setLength(0);
+            refreshInputMode();
+        });
+        switchMode.setTag("modeSwitch");
+        header.addView(switchMode, new LinearLayout.LayoutParams(dp(78), dp(42)));
+        root.addView(header, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(46)));
+
+        contentContainer = new LinearLayout(this);
+        contentContainer.setOrientation(LinearLayout.VERTICAL);
+        root.addView(contentContainer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        refreshInputMode();
+        return root;
+    }
+
+    private void refreshInputMode() {
+        if (contentContainer == null) {
+            return;
+        }
+        View switchMode = ((ViewGroup) contentContainer.getParent()).getChildAt(0);
+        if (switchMode instanceof ViewGroup) {
+            View button = ((ViewGroup) switchMode).findViewWithTag("modeSwitch");
+            if (button instanceof Button) {
+                ((Button) button).setText(textMode ? "表情" : "文字");
+            }
+        }
+        contentContainer.removeAllViews();
+        if (textMode) {
+            contentContainer.addView(createTextPanel(), new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        } else {
+            contentContainer.addView(createEmojiPanel(), new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        }
+    }
+
+    private View createEmojiPanel() {
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.HORIZONTAL);
 
         LinearLayout rail = new LinearLayout(this);
         rail.setOrientation(LinearLayout.VERTICAL);
@@ -71,11 +132,13 @@ public class EmojiInputMethodService extends InputMethodService {
         galleryScroll.addView(galleryRail, matchWrap());
         rail.addView(galleryScroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        root.addView(rail, new LinearLayout.LayoutParams(dp(56), dp(292)));
+        root.addView(rail, new LinearLayout.LayoutParams(
+                dp(56), ViewGroup.LayoutParams.MATCH_PARENT));
 
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        root.addView(panel, new LinearLayout.LayoutParams(0, dp(292), 1f));
+        root.addView(panel, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
 
         HorizontalScrollView packScroll = new HorizontalScrollView(this);
         packScroll.setHorizontalScrollBarEnabled(false);
@@ -130,6 +193,194 @@ public class EmojiInputMethodService extends InputMethodService {
 
         reloadCatalog();
         return root;
+    }
+
+    private View createTextPanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+
+        HorizontalScrollView candidateScroll = new HorizontalScrollView(this);
+        candidateScroll.setHorizontalScrollBarEnabled(false);
+        candidateStrip = new LinearLayout(this);
+        candidateStrip.setGravity(Gravity.CENTER_VERTICAL);
+        candidateScroll.addView(candidateStrip, matchWrap());
+        panel.addView(candidateScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(46)));
+
+        composingLabel = label("", 12);
+        composingLabel.setTextColor(secondaryTextColor());
+        composingLabel.setGravity(Gravity.CENTER_VERTICAL);
+        composingLabel.setPadding(dp(10), 0, dp(10), 0);
+        panel.addView(composingLabel, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(22)));
+
+        addKeyRow(panel, "QWERTYUIOP", 0.0f, false);
+        addKeyRow(panel, "ASDFGHJKL", 0.05f, false);
+        addKeyRow(panel, "ZXCVBNM", 0.10f, true);
+
+        LinearLayout controls = new LinearLayout(this);
+        controls.setGravity(Gravity.CENTER);
+        addControlKey(controls, "符", "输入符号", view -> commitText("，"), 0.9f);
+        addControlKey(controls, "123", "切换数字输入", view -> commitText("123"), 1.0f);
+        addControlKey(controls, ",", "输入逗号", view -> commitText("，"), 0.8f);
+        addControlKey(controls, "空格", "选择首个候选或输入空格", view -> chooseFirstCandidate(), 2.5f);
+        addControlKey(controls, "。", "输入句号", view -> commitText("。"), 0.8f);
+        addControlKey(controls, "中英", "切换中文或英文输入", view -> toggleLanguage(), 1.0f);
+        addControlKey(controls, "回车", "换行", view -> sendEnter(), 1.0f);
+        panel.addView(controls, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
+        renderCandidates();
+        return panel;
+    }
+
+    private void addKeyRow(LinearLayout panel, String keys, float insetWeight, boolean withBackspace) {
+        LinearLayout row = new LinearLayout(this);
+        row.setGravity(Gravity.CENTER);
+        if (insetWeight > 0f) {
+            View inset = new View(this);
+            row.addView(inset, new LinearLayout.LayoutParams(0, 1, insetWeight));
+        }
+        for (int index = 0; index < keys.length(); index++) {
+            String key = String.valueOf(keys.charAt(index));
+            addControlKey(row, key, "输入字母" + key, view -> appendPinyin(key), 1f);
+        }
+        if (withBackspace) {
+            addControlKey(row, "删", "删除拼音或前一个字符", view -> deleteLast(), 1f);
+        }
+        if (insetWeight > 0f) {
+            View inset = new View(this);
+            row.addView(inset, new LinearLayout.LayoutParams(0, 1, insetWeight));
+        }
+        panel.addView(row, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+    }
+
+    private void addControlKey(
+            LinearLayout row,
+            String text,
+            String description,
+            View.OnClickListener listener,
+            float weight) {
+        Button key = button(text, description, listener);
+        key.setTextSize(15);
+        key.setBackgroundColor(railColor());
+        key.setTextColor(primaryTextColor());
+        LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(0, dp(48), weight);
+        layout.setMargins(dp(1), dp(1), dp(1), dp(1));
+        row.addView(key, layout);
+    }
+
+    private void appendPinyin(String key) {
+        if (englishMode) {
+            commitText(key);
+            return;
+        }
+        pinyinBuffer.append(key.toLowerCase(java.util.Locale.ROOT));
+        renderCandidates();
+    }
+
+    private void toggleLanguage() {
+        commitPinyin();
+        englishMode = !englishMode;
+        if (composingLabel != null) {
+            composingLabel.setText(englishMode ? "英文" : "中文");
+        }
+    }
+
+    private void deleteLast() {
+        if (pinyinBuffer.length() > 0) {
+            pinyinBuffer.deleteCharAt(pinyinBuffer.length() - 1);
+            renderCandidates();
+            return;
+        }
+        InputConnection connection = getCurrentInputConnection();
+        if (connection != null) {
+            connection.deleteSurroundingText(1, 0);
+        }
+    }
+
+    private void renderCandidates() {
+        if (candidateStrip == null || composingLabel == null) {
+            return;
+        }
+        candidateStrip.removeAllViews();
+        String pinyin = pinyinBuffer.toString();
+        composingLabel.setText(pinyin.isEmpty() && englishMode ? "英文" : pinyin);
+        InputConnection connection = getCurrentInputConnection();
+        if (connection != null) {
+            connection.setComposingText(pinyin, 1);
+        }
+        if (pinyin.isEmpty()) {
+            return;
+        }
+        if (pinyinDictionary == null) {
+            pinyinDictionary = PinyinDictionary.load(this);
+        }
+        List<String> candidates = pinyinDictionary.query(pinyin, CANDIDATE_LIMIT);
+        for (String candidate : candidates) {
+            Button button = button(candidate, "选择候选词" + candidate,
+                    view -> commitCandidate(candidate));
+            button.setTextSize(16);
+            candidateStrip.addView(button, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)));
+        }
+        if (candidates.isEmpty()) {
+            candidateStrip.addView(label("无候选", 12), new LinearLayout.LayoutParams(dp(70), dp(42)));
+        }
+    }
+
+    private void chooseFirstCandidate() {
+        if (pinyinBuffer.length() == 0) {
+            commitText(" ");
+            return;
+        }
+        if (pinyinDictionary == null) {
+            pinyinDictionary = PinyinDictionary.load(this);
+        }
+        List<String> candidates = pinyinDictionary.query(pinyinBuffer.toString(), 1);
+        if (candidates.isEmpty()) {
+            commitPinyin();
+        } else {
+            commitCandidate(candidates.get(0));
+        }
+    }
+
+    private void commitCandidate(String candidate) {
+        InputConnection connection = getCurrentInputConnection();
+        if (connection != null) {
+            connection.commitText(candidate, 1);
+        }
+        pinyinBuffer.setLength(0);
+        renderCandidates();
+    }
+
+    private void commitPinyin() {
+        if (pinyinBuffer.length() == 0) {
+            return;
+        }
+        InputConnection connection = getCurrentInputConnection();
+        if (connection != null) {
+            connection.commitText(pinyinBuffer.toString(), 1);
+        }
+        pinyinBuffer.setLength(0);
+        renderCandidates();
+    }
+
+    private void commitText(String text) {
+        commitPinyin();
+        InputConnection connection = getCurrentInputConnection();
+        if (connection != null) {
+            connection.commitText(text, 1);
+        }
+    }
+
+    private void sendEnter() {
+        commitPinyin();
+        InputConnection connection = getCurrentInputConnection();
+        if (connection != null) {
+            connection.sendKeyEvent(new android.view.KeyEvent(
+                    android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_ENTER));
+        }
     }
 
     @Override

@@ -965,7 +965,8 @@ public class MainActivity extends AppCompatActivity {
                         "申请共享图片读取权限",
                         "打开系统输入法设置",
                         "弹出输入法选择器",
-                        "应用内接收诊断"
+                        "应用内接收诊断",
+                        "云端"
                 }, (dialog, which) -> {
                     if (which == 0) {
                         requestDirectoryImport();
@@ -979,8 +980,10 @@ public class MainActivity extends AppCompatActivity {
                         if (manager != null) {
                             manager.showInputMethodPicker();
                         }
-                    } else {
+                    } else if (which == 4) {
                         showReceiveDiagnostics();
+                    } else {
+                        startActivity(new Intent(this, CloudActivity.class));
                     }
                 })
                 .show();
