@@ -200,6 +200,29 @@ public class LocalEmojiCatalogRepositoryTest {
     }
 
     @Test
+    public void batchUnlinkRemovesSelectedPackReferencesInOneCatalogWrite() throws Exception {
+        File filesDirectory = temporaryFolder.newFolder("batch-unlink-files");
+        File legacy = createFile("batch-unlink-current.png", new byte[]{1});
+        LocalEmojiCatalogRepository repository = new LocalEmojiCatalogRepository(filesDirectory);
+        repository.loadDefaultEmoji(legacy, "image/png");
+        java.util.List<EmojiCatalog.Pack> created = repository.createPacks(
+                java.util.Collections.singletonList(LocalEmojiCatalogRepository.DEFAULT_GALLERY_ID),
+                java.util.Arrays.asList("可移除一", "可移除二"));
+
+        repository.unlinkPacksFromGallery(
+                LocalEmojiCatalogRepository.DEFAULT_GALLERY_ID,
+                java.util.Arrays.asList(created.get(0).getId(), created.get(1).getId()));
+
+        EmojiCatalog result = repository.loadCatalog();
+        assertFalse(result.galleryContainsPack(
+                LocalEmojiCatalogRepository.DEFAULT_GALLERY_ID, created.get(0).getId()));
+        assertFalse(result.galleryContainsPack(
+                LocalEmojiCatalogRepository.DEFAULT_GALLERY_ID, created.get(1).getId()));
+        assertEquals(1, result.getPacksForGallery(
+                LocalEmojiCatalogRepository.DEFAULT_GALLERY_ID).size());
+    }
+
+    @Test
     public void sameContentCanBelongToDifferentIndependentPacks() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("pack-scoped-duplicate-files");
         File legacy = createFile("scoped-current.png", new byte[]{1});

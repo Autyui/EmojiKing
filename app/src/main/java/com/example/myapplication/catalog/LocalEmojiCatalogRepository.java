@@ -200,9 +200,19 @@ public final class LocalEmojiCatalogRepository {
 
     public synchronized void unlinkPackFromGallery(String galleryId, String packId)
             throws IOException {
+        unlinkPacksFromGallery(galleryId, Collections.singletonList(packId));
+    }
+
+    public synchronized void unlinkPacksFromGallery(
+            String galleryId, List<String> packIds) throws IOException {
         EmojiCatalog current = requireCatalog();
-        catalogFile.write(codec.encode(
-                EmojiCatalogEditor.unlinkPack(current, galleryId, packId)));
+        requireGallery(current, galleryId);
+        EmojiCatalog updated = current;
+        for (String packId : uniqueRequiredIds(packIds, "emoji pack")) {
+            requirePack(updated, packId);
+            updated = EmojiCatalogEditor.unlinkPack(updated, galleryId, packId);
+        }
+        catalogFile.write(codec.encode(updated));
     }
 
     public synchronized void renamePack(String packId, String name) throws IOException {

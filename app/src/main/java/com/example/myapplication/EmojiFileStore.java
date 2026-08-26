@@ -218,6 +218,13 @@ public final class EmojiFileStore {
         repository(context).unlinkPackFromGallery(galleryId, packId);
     }
 
+    public static synchronized void unlinkPacksFromGallery(
+            Context context,
+            String galleryId,
+            List<String> packIds) throws IOException {
+        repository(context).unlinkPacksFromGallery(galleryId, packIds);
+    }
+
     public static synchronized void renamePack(Context context, String packId, String name)
             throws IOException {
         repository(context).renamePack(packId, name);

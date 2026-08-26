@@ -5,9 +5,11 @@ import android.content.ClipData;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.provider.DocumentsContract;
 import android.provider.Settings;
 import android.text.InputType;
@@ -15,6 +17,7 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewConfiguration;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
@@ -37,6 +40,7 @@ import com.example.myapplication.catalog.EmojiCatalog;
 import com.example.myapplication.catalog.LocalEmojiCatalogRepository;
 
 import java.io.IOException;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -62,6 +66,10 @@ public class MainActivity extends AppCompatActivity {
     private EmojiCatalog catalog;
     private String selectedGalleryId;
     private String selectedPackId;
+    private String lastGalleryTapId;
+    private long lastGalleryTapAt;
+    private String lastPackTapId;
+    private long lastPackTapAt;
     private boolean importBusy;
     private boolean openDirectoryAfterPermission;
 
@@ -121,25 +129,8 @@ public class MainActivity extends AppCompatActivity {
         content.addView(packScroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(68)));
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.CENTER_VERTICAL);
-        actions.setPadding(dp(6), 0, dp(6), dp(4));
-        Button addPack = compactButton("+ 表情包", "添加表情包", view -> showAddPackMenu());
-        Button manageGallery = compactButton("图库", "管理当前图库", view -> showGalleryMenu());
-        Button managePack = compactButton("表情包", "管理当前表情包", view -> showPackMenu());
-        Button addImages = compactButton("+ 图片", "向当前表情包添加图片", view -> openImagePicker());
-        busyControls.add(addPack);
-        busyControls.add(manageGallery);
-        busyControls.add(managePack);
-        busyControls.add(addImages);
-        actions.addView(addPack, weightedWrap());
-        actions.addView(manageGallery, weightedWrap());
-        actions.addView(managePack, weightedWrap());
-        actions.addView(addImages, weightedWrap());
-        content.addView(actions, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
-
+        LinearLayout gridArea = new LinearLayout(this);
+        gridArea.setOrientation(LinearLayout.VERTICAL);
         FrameLayout gridFrame = new FrameLayout(this);
         emojiGrid = new GridView(this);
         emojiGrid.setNumColumns(4);
@@ -160,7 +151,18 @@ public class MainActivity extends AppCompatActivity {
         emptyState.setGravity(Gravity.CENTER);
         gridFrame.addView(emptyState, matchMatch());
         emojiGrid.setEmptyView(emptyState);
-        content.addView(gridFrame, new LinearLayout.LayoutParams(
+        gridArea.addView(gridFrame, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+
+        Button addImages = compactButton("+", "向当前表情包添加图片", view -> openImagePicker());
+        busyControls.add(addImages);
+        LinearLayout importBar = new LinearLayout(this);
+        importBar.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        importBar.setPadding(dp(6), dp(4), dp(6), dp(4));
+        importBar.addView(addImages, new LinearLayout.LayoutParams(dp(76), dp(76)));
+        gridArea.addView(importBar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(84)));
+        content.addView(gridArea, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         status = new TextView(this);
@@ -190,6 +192,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void reloadCatalog(String preferredGalleryId, String preferredPackId) {
+        clearTapTracking();
         try {
             catalog = EmojiFileStore.getCatalog(this);
             EmojiSelectionStore.Selection saved = EmojiSelectionStore.resolve(this, catalog);
@@ -211,6 +214,13 @@ public class MainActivity extends AppCompatActivity {
                     R.string.catalog_load_failure,
                     readableMessage(exception)));
         }
+    }
+
+    private void clearTapTracking() {
+        lastGalleryTapId = null;
+        lastGalleryTapAt = 0L;
+        lastPackTapId = null;
+        lastPackTapAt = 0L;
     }
 
     private void selectGallery(String galleryId, String preferredPackId) {
@@ -251,7 +261,7 @@ public class MainActivity extends AppCompatActivity {
             Button button = compactButton(
                     gallery.getName(),
                     "选择图库" + gallery.getName(),
-                    view -> selectGallery(gallery.getId(), null));
+                    view -> handleGalleryTap(gallery));
             button.setMaxLines(2);
             button.setEllipsize(TextUtils.TruncateAt.END);
             button.setTextSize(11);
@@ -271,7 +281,7 @@ public class MainActivity extends AppCompatActivity {
             Button button = compactButton(
                     pack.getName(),
                     "选择表情包" + pack.getName(),
-                    view -> selectPack(pack.getId()));
+                    view -> handlePackTap(pack));
             button.setMaxLines(2);
             button.setEllipsize(TextUtils.TruncateAt.END);
             button.setTextSize(12);
@@ -285,6 +295,10 @@ public class MainActivity extends AppCompatActivity {
             empty.setTextColor(secondaryTextColor());
             packStrip.addView(empty, new LinearLayout.LayoutParams(dp(160), dp(60)));
         }
+        Button addPack = compactButton("+", "添加表情包", view -> showAddPackMenu());
+        packControls.add(addPack);
+        addPack.setEnabled(!importBusy);
+        packStrip.addView(addPack, new LinearLayout.LayoutParams(dp(60), dp(60)));
     }
 
     private void renderGrid() {
@@ -427,14 +441,44 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void showGalleryMenu() {
-        EmojiCatalog.Gallery gallery = selectedGallery();
-        if (gallery == null) {
-            return;
+    private void handleGalleryTap(EmojiCatalog.Gallery gallery) {
+        boolean doubleTap = isDoubleTap(gallery.getId(), true);
+        selectGallery(gallery.getId(), null);
+        if (doubleTap) {
+            showGalleryMenu(gallery);
         }
+    }
+
+    private void handlePackTap(EmojiCatalog.Pack pack) {
+        boolean doubleTap = isDoubleTap(pack.getId(), false);
+        selectPack(pack.getId());
+        if (doubleTap) {
+            showPackMenu(pack);
+        }
+    }
+
+    /** Keeps double-tap detection stable across the selection row's redraws. */
+    private boolean isDoubleTap(String itemId, boolean gallery) {
+        long now = SystemClock.uptimeMillis();
+        String previousId = gallery ? lastGalleryTapId : lastPackTapId;
+        long previousAt = gallery ? lastGalleryTapAt : lastPackTapAt;
+        boolean matched = itemId.equals(previousId)
+                && now >= previousAt
+                && now - previousAt <= ViewConfiguration.getDoubleTapTimeout();
+        if (gallery) {
+            lastGalleryTapId = matched ? null : itemId;
+            lastGalleryTapAt = matched ? 0L : now;
+        } else {
+            lastPackTapId = matched ? null : itemId;
+            lastPackTapAt = matched ? 0L : now;
+        }
+        return matched;
+    }
+
+    private void showGalleryMenu(EmojiCatalog.Gallery gallery) {
         new AlertDialog.Builder(this)
                 .setTitle(gallery.getName())
-                .setItems(new String[]{"重命名图库", "删除图库"}, (dialog, which) -> {
+                .setItems(new String[]{"重命名" + gallery.getName(), "删除图库"}, (dialog, which) -> {
                     if (which == 0) {
                         showTextDialog("重命名图库", "图库名称", gallery.getName(), value -> {
                             try {
@@ -467,24 +511,58 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
-    private void showPackMenu() {
-        EmojiCatalog.Pack pack = selectedPack();
-        if (pack == null) {
-            toast("当前图库没有表情包");
-            return;
-        }
+    private void showPackMenu(EmojiCatalog.Pack pack) {
         new AlertDialog.Builder(this)
                 .setTitle(pack.getName())
-                .setItems(new String[]{"重命名", "从当前图库移除", "彻底删除表情包"},
+                .setItems(new String[]{"重命名" + pack.getName(), "批量移除表情包"},
                         (dialog, which) -> {
                             if (which == 0) {
                                 showRenamePackDialog(pack);
-                            } else if (which == 1) {
-                                confirmUnlinkPack(pack);
                             } else {
-                                confirmDeletePack(pack);
+                                showBatchUnlinkPackDialog();
                             }
                         })
+                .show();
+    }
+
+    private void showBatchUnlinkPackDialog() {
+        if (catalog == null || selectedGalleryId == null) {
+            return;
+        }
+        List<EmojiCatalog.Pack> packs = catalog.getPacksForGallery(selectedGalleryId);
+        if (packs.isEmpty()) {
+            toast("当前图库没有表情包");
+            return;
+        }
+        String[] labels = new String[packs.size()];
+        boolean[] checked = new boolean[packs.size()];
+        for (int index = 0; index < packs.size(); index++) {
+            labels[index] = packs.get(index).getName();
+            checked[index] = packs.get(index).getId().equals(selectedPackId);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle("批量移除表情包")
+                .setMultiChoiceItems(labels, checked,
+                        (dialog, which, value) -> checked[which] = value)
+                .setNegativeButton("取消", null)
+                .setPositiveButton("移除", (dialog, which) -> {
+                    List<String> ids = new ArrayList<>();
+                    for (int index = 0; index < checked.length; index++) {
+                        if (checked[index]) {
+                            ids.add(packs.get(index).getId());
+                        }
+                    }
+                    if (ids.isEmpty()) {
+                        toast("请至少选择一个表情包");
+                        return;
+                    }
+                    try {
+                        EmojiFileStore.unlinkPacksFromGallery(this, selectedGalleryId, ids);
+                        reloadCatalog(selectedGalleryId, null);
+                    } catch (Exception exception) {
+                        operationFailed("批量移除失败", exception);
+                    }
+                })
                 .show();
     }
 
@@ -499,50 +577,16 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void confirmUnlinkPack(EmojiCatalog.Pack pack) {
-        new AlertDialog.Builder(this)
-                .setTitle("从图库移除")
-                .setMessage("表情包会从当前图库移除，但仍可再次加入其他图库。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("移除", (dialog, which) -> {
-                    try {
-                        EmojiFileStore.unlinkPackFromGallery(
-                                this, selectedGalleryId, pack.getId());
-                        reloadCatalog(selectedGalleryId, null);
-                    } catch (Exception exception) {
-                        operationFailed("移除失败", exception);
-                    }
-                })
-                .show();
-    }
-
-    private void confirmDeletePack(EmojiCatalog.Pack pack) {
-        new AlertDialog.Builder(this)
-                .setTitle("彻底删除表情包")
-                .setMessage("将从所有图库删除该表情包及其图片。此操作无法撤销。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("删除", (dialog, which) -> {
-                    try {
-                        EmojiFileStore.deletePack(this, pack.getId());
-                        reloadCatalog(selectedGalleryId, null);
-                    } catch (Exception exception) {
-                        operationFailed("删除失败", exception);
-                    }
-                })
-                .show();
-    }
-
     private void showItemActions(EmojiCatalog.Item item) {
-        String note = item.getNote().isEmpty() ? "无备注" : item.getNote();
         new AlertDialog.Builder(this)
                 .setTitle(item.getName())
-                .setMessage(note)
-                .setItems(new String[]{"分享测试", "编辑备注", "删除表情"},
+                .setItems(new String[]{
+                                item.getNote().isEmpty() ? "增加备注" : "修改备注",
+                                "移除",
+                                "查看"},
                         (dialog, which) -> {
                             if (which == 0) {
-                                shareItem(item);
-                            } else if (which == 1) {
-                                showTextDialog("编辑备注", "备注可留空", item.getNote(), value -> {
+                                showTextDialog("增加备注", "备注可留空", item.getNote(), value -> {
                                     try {
                                         EmojiFileStore.updateItemNote(this, item.getId(), value);
                                         reloadCatalog(selectedGalleryId, selectedPackId);
@@ -550,43 +594,95 @@ public class MainActivity extends AppCompatActivity {
                                         operationFailed("保存失败", exception);
                                     }
                                 });
-                            } else {
+                            } else if (which == 1) {
                                 confirmDeleteItem(item);
+                            } else {
+                                showItemDetails(item);
                             }
                         })
                 .show();
     }
 
+    private void showItemDetails(EmojiCatalog.Item item) {
+        try {
+            LocalEmojiCatalogRepository.StoredEmoji stored = EmojiFileStore.getStoredEmoji(
+                    this, item.getId());
+            Bitmap bitmap = decodeDetailBitmap(stored.getFile());
+            if (bitmap == null) {
+                throw new IOException("图片无法解码");
+            }
+            ZoomableImageView preview = new ZoomableImageView(this);
+            preview.setImageBitmap(bitmap);
+            preview.setContentDescription(item.getName() + "详情");
+            preview.setBackgroundColor(0xff111111);
+
+            FrameLayout previewFrame = new FrameLayout(this);
+            previewFrame.setPadding(dp(4), dp(4), dp(4), dp(4));
+            previewFrame.addView(preview, new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+
+            LinearLayout controls = new LinearLayout(this);
+            controls.setGravity(Gravity.CENTER);
+            Button zoomOut = compactButton("-", "缩小图片", view -> preview.zoomBy(0.8f));
+            Button reset = compactButton("重置", "恢复图片适合窗口大小", view -> preview.resetZoom());
+            Button zoomIn = compactButton("+", "放大图片", view -> preview.zoomBy(1.25f));
+            controls.addView(zoomOut, new LinearLayout.LayoutParams(dp(64), dp(48)));
+            controls.addView(reset, new LinearLayout.LayoutParams(dp(84), dp(48)));
+            controls.addView(zoomIn, new LinearLayout.LayoutParams(dp(64), dp(48)));
+
+            LinearLayout panel = new LinearLayout(this);
+            panel.setOrientation(LinearLayout.VERTICAL);
+            TextView noteView = compactLabel(item.getNote().isEmpty() ? "无备注" : item.getNote());
+            noteView.setTextColor(secondaryTextColor());
+            noteView.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+            panel.addView(previewFrame, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(360)));
+            panel.addView(controls, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+            panel.addView(noteView, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
+            new AlertDialog.Builder(this)
+                    .setTitle(item.getName())
+                    .setView(panel)
+                    .setPositiveButton("关闭", null)
+                    .show();
+        } catch (Exception exception) {
+            operationFailed("查看失败", exception);
+        }
+    }
+
+    private static Bitmap decodeDetailBitmap(File file) {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        BitmapFactory.decodeFile(file.getAbsolutePath(), bounds);
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            return null;
+        }
+        int sample = 1;
+        int largest = Math.max(bounds.outWidth, bounds.outHeight);
+        while (largest / sample > 2048) {
+            sample *= 2;
+        }
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sample;
+        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
+        return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
+    }
+
     private void confirmDeleteItem(EmojiCatalog.Item item) {
         new AlertDialog.Builder(this)
-                .setTitle("删除表情")
-                .setMessage("确定删除“" + item.getName() + "”？表情库中必须至少保留一张图片。")
+                .setTitle("移除表情")
+                .setMessage("确定移除“" + item.getName() + "”？表情库中必须至少保留一张图片。")
                 .setNegativeButton("取消", null)
-                .setPositiveButton("删除", (dialog, which) -> {
+                .setPositiveButton("移除", (dialog, which) -> {
                     try {
                         EmojiFileStore.deleteItem(this, item.getId());
                         reloadCatalog(selectedGalleryId, selectedPackId);
                     } catch (Exception exception) {
-                        operationFailed("删除失败", exception);
+                        operationFailed("移除失败", exception);
                     }
                 })
                 .show();
-    }
-
-    private void shareItem(EmojiCatalog.Item item) {
-        try {
-            LocalEmojiCatalogRepository.StoredEmoji stored = EmojiFileStore.getStoredEmoji(
-                    this, item.getId());
-            ImageShareSender.Result result = ImageShareSender.send(
-                    this, null, EmojiFileStore.getUri(this, stored), item.getMimeType());
-            toast(result == ImageShareSender.Result.CHOOSER_STARTED
-                    ? "已打开系统分享选择器"
-                    : result == ImageShareSender.Result.TARGET_STARTED
-                    ? "已打开目标应用分享"
-                    : "没有可用的图片分享入口");
-        } catch (Exception exception) {
-            operationFailed("图片无法分享", exception);
-        }
     }
 
     private void openImagePicker() {
@@ -997,10 +1093,6 @@ public class MainActivity extends AppCompatActivity {
     private static String readableMessage(Exception exception) {
         String message = exception.getMessage();
         return message == null || message.trim().isEmpty() ? "未知错误" : message.trim();
-    }
-
-    private LinearLayout.LayoutParams weightedWrap() {
-        return new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f);
     }
 
     private LinearLayout.LayoutParams matchWrap() {
