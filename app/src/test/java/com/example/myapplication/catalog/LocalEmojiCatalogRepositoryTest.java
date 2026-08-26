@@ -223,6 +223,67 @@ public class LocalEmojiCatalogRepositoryTest {
     }
 
     @Test
+    public void batchDeleteRemovesSelectedItemsOnlyFromTheSelectedPack() throws Exception {
+        File filesDirectory = temporaryFolder.newFolder("batch-delete-items-files");
+        File legacy = createFile("batch-delete-current.png", new byte[]{1});
+        File first = createFile("batch-delete-first.png", new byte[]{2});
+        File second = createFile("batch-delete-second.png", new byte[]{3});
+        File third = createFile("batch-delete-third.png", new byte[]{4});
+        LocalEmojiCatalogRepository repository = new LocalEmojiCatalogRepository(filesDirectory);
+        repository.loadDefaultEmoji(legacy, "image/png");
+        EmojiCatalog.Pack pack = repository.createPack(
+                LocalEmojiCatalogRepository.DEFAULT_GALLERY_ID, "可批量删除");
+        LocalEmojiCatalogRepository.ImportResult firstResult = repository.importEmoji(
+                pack.getId(), first, first.getName(), "image/png");
+        LocalEmojiCatalogRepository.ImportResult secondResult = repository.importEmoji(
+                pack.getId(), second, second.getName(), "image/png");
+        LocalEmojiCatalogRepository.ImportResult thirdResult = repository.importEmoji(
+                pack.getId(), third, third.getName(), "image/png");
+
+        repository.deleteItems(pack.getId(), java.util.Arrays.asList(
+                firstResult.getEmoji().getItem().getId(),
+                secondResult.getEmoji().getItem().getId()));
+
+        EmojiCatalog.Pack updatedPack = repository.loadCatalog().getPack(pack.getId());
+        assertEquals(1, updatedPack.getItems().size());
+        assertEquals(thirdResult.getEmoji().getItem().getId(),
+                updatedPack.getItems().get(0).getId());
+        assertFalse(firstResult.getEmoji().getFile().exists());
+        assertFalse(secondResult.getEmoji().getFile().exists());
+        assertTrue(thirdResult.getEmoji().getFile().exists());
+        assertTrue(first.isFile());
+        assertTrue(second.isFile());
+        assertTrue(third.isFile());
+        assertEquals(2, countItems(repository.loadCatalog()));
+    }
+
+    @Test
+    public void deletingPackDoesNotDeleteOtherPackCopyOrSourceFile() throws Exception {
+        File filesDirectory = temporaryFolder.newFolder("delete-pack-isolation-files");
+        File legacy = createFile("delete-pack-isolation-current.png", new byte[]{1});
+        File firstSource = createFile("delete-pack-isolation-first.png", new byte[]{8, 8});
+        File secondSource = createFile("delete-pack-isolation-second.png", new byte[]{8, 8});
+        LocalEmojiCatalogRepository repository = new LocalEmojiCatalogRepository(filesDirectory);
+        repository.loadDefaultEmoji(legacy, "image/png");
+        EmojiCatalog.Pack firstPack = repository.createPack(
+                LocalEmojiCatalogRepository.DEFAULT_GALLERY_ID, "类一");
+        EmojiCatalog.Pack secondPack = repository.createPack(
+                LocalEmojiCatalogRepository.DEFAULT_GALLERY_ID, "类二");
+        LocalEmojiCatalogRepository.ImportResult first = repository.importEmoji(
+                firstPack.getId(), firstSource, firstSource.getName(), "image/png");
+        LocalEmojiCatalogRepository.ImportResult second = repository.importEmoji(
+                secondPack.getId(), secondSource, secondSource.getName(), "image/png");
+
+        repository.deletePack(firstPack.getId());
+
+        assertFalse(first.getEmoji().getFile().exists());
+        assertTrue(second.getEmoji().getFile().exists());
+        assertTrue(firstSource.isFile());
+        assertTrue(secondSource.isFile());
+        assertTrue(repository.loadCatalog().getPack(secondPack.getId()) != null);
+    }
+
+    @Test
     public void sameContentCanBelongToDifferentIndependentPacks() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("pack-scoped-duplicate-files");
         File legacy = createFile("scoped-current.png", new byte[]{1});

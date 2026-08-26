@@ -43,7 +43,9 @@ import java.io.IOException;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -61,6 +63,9 @@ public class MainActivity extends AppCompatActivity {
     private LinearLayout packStrip;
     private GridView emojiGrid;
     private EmojiGridAdapter gridAdapter;
+    private LinearLayout batchDeleteBar;
+    private TextView batchDeleteCount;
+    private Button batchDeleteButton;
     private TextView emptyState;
     private TextView status;
     private EmojiCatalog catalog;
@@ -70,6 +75,9 @@ public class MainActivity extends AppCompatActivity {
     private long lastGalleryTapAt;
     private String lastPackTapId;
     private long lastPackTapAt;
+    private boolean batchDeleteMode;
+    private String batchDeletePackId;
+    private final Set<String> selectedItemIds = new LinkedHashSet<>();
     private boolean importBusy;
     private boolean openDirectoryAfterPermission;
 
@@ -129,6 +137,25 @@ public class MainActivity extends AppCompatActivity {
         content.addView(packScroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(68)));
 
+        batchDeleteBar = new LinearLayout(this);
+        batchDeleteBar.setGravity(Gravity.CENTER_VERTICAL);
+        batchDeleteBar.setPadding(dp(8), dp(2), dp(8), dp(2));
+        batchDeleteCount = compactLabel("已选择 0 项");
+        batchDeleteCount.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        batchDeleteBar.addView(batchDeleteCount, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+        Button cancelBatchDelete = compactButton(
+                "取消", "退出批量删除模式", view -> exitBatchDeleteMode());
+        batchDeleteBar.addView(cancelBatchDelete, new LinearLayout.LayoutParams(dp(80), dp(48)));
+        batchDeleteButton = compactButton(
+                "删除", "删除已勾选表情包", view -> confirmBatchDeleteItems());
+        batchDeleteBar.addView(batchDeleteButton, new LinearLayout.LayoutParams(dp(80), dp(48)));
+        busyControls.add(cancelBatchDelete);
+        busyControls.add(batchDeleteButton);
+        batchDeleteBar.setVisibility(View.GONE);
+        content.addView(batchDeleteBar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+
         LinearLayout gridArea = new LinearLayout(this);
         gridArea.setOrientation(LinearLayout.VERTICAL);
         FrameLayout gridFrame = new FrameLayout(this);
@@ -141,8 +168,14 @@ public class MainActivity extends AppCompatActivity {
         emojiGrid.setClipToPadding(false);
         gridAdapter = new EmojiGridAdapter(this, 92, 76);
         emojiGrid.setAdapter(gridAdapter);
-        emojiGrid.setOnItemClickListener((parent, view, position, id) ->
-                showItemActions(gridAdapter.getItem(position)));
+        emojiGrid.setOnItemClickListener((parent, view, position, id) -> {
+            EmojiCatalog.Item item = gridAdapter.getItem(position);
+            if (batchDeleteMode) {
+                toggleBatchDeleteItem(item);
+            } else {
+                showItemActions(item);
+            }
+        });
         gridFrame.addView(emojiGrid, matchMatch());
 
         emptyState = new TextView(this);
@@ -192,6 +225,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void reloadCatalog(String preferredGalleryId, String preferredPackId) {
+        clearBatchDeleteState();
         clearTapTracking();
         try {
             catalog = EmojiFileStore.getCatalog(this);
@@ -305,6 +339,8 @@ public class MainActivity extends AppCompatActivity {
         EmojiCatalog.Pack pack = selectedPack();
         if (pack == null) {
             gridAdapter.setItems(Collections.emptyList());
+            gridAdapter.setSelectionMode(false, Collections.emptySet());
+            updateBatchDeleteBar();
             emptyState.setText("当前图库没有表情包\n点击“+ 表情包”添加");
             status.setText(getString(
                     R.string.catalog_empty_status,
@@ -312,6 +348,10 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         gridAdapter.setItems(pack.getItems());
+        boolean selectionActive = batchDeleteMode && pack.getId().equals(batchDeletePackId);
+        gridAdapter.setSelectionMode(selectionActive,
+                selectionActive ? selectedItemIds : Collections.emptySet());
+        updateBatchDeleteBar();
         emptyState.setText("当前表情包为空\n点击“+ 图片”导入");
         status.setText(getString(
                 R.string.catalog_pack_status,
@@ -442,6 +482,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void handleGalleryTap(EmojiCatalog.Gallery gallery) {
+        if (batchDeleteMode) {
+            exitBatchDeleteMode();
+        }
         boolean doubleTap = isDoubleTap(gallery.getId(), true);
         selectGallery(gallery.getId(), null);
         if (doubleTap) {
@@ -450,6 +493,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void handlePackTap(EmojiCatalog.Pack pack) {
+        if (batchDeleteMode) {
+            exitBatchDeleteMode();
+        }
         boolean doubleTap = isDoubleTap(pack.getId(), false);
         selectPack(pack.getId());
         if (doubleTap) {
@@ -514,53 +560,86 @@ public class MainActivity extends AppCompatActivity {
     private void showPackMenu(EmojiCatalog.Pack pack) {
         new AlertDialog.Builder(this)
                 .setTitle(pack.getName())
-                .setItems(new String[]{"重命名" + pack.getName(), "批量移除表情包"},
+                .setItems(new String[]{"重命名" + pack.getName(), "批量删除表情包", "删除该类"},
                         (dialog, which) -> {
                             if (which == 0) {
                                 showRenamePackDialog(pack);
+                            } else if (which == 1) {
+                                enterBatchDeleteMode(pack);
                             } else {
-                                showBatchUnlinkPackDialog();
+                                confirmDeletePack(pack);
                             }
                         })
                 .show();
     }
 
-    private void showBatchUnlinkPackDialog() {
-        if (catalog == null || selectedGalleryId == null) {
+    private void enterBatchDeleteMode(EmojiCatalog.Pack pack) {
+        if (pack.getItems().isEmpty()) {
+            toast("当前类没有可删除的表情包");
             return;
         }
-        List<EmojiCatalog.Pack> packs = catalog.getPacksForGallery(selectedGalleryId);
-        if (packs.isEmpty()) {
-            toast("当前图库没有表情包");
+        batchDeleteMode = true;
+        batchDeletePackId = pack.getId();
+        selectedItemIds.clear();
+        renderGrid();
+    }
+
+    private void toggleBatchDeleteItem(EmojiCatalog.Item item) {
+        if (!selectedItemIds.add(item.getId())) {
+            selectedItemIds.remove(item.getId());
+        }
+        gridAdapter.setSelectionMode(true, selectedItemIds);
+        updateBatchDeleteBar();
+    }
+
+    private void updateBatchDeleteBar() {
+        if (batchDeleteBar == null) {
             return;
         }
-        String[] labels = new String[packs.size()];
-        boolean[] checked = new boolean[packs.size()];
-        for (int index = 0; index < packs.size(); index++) {
-            labels[index] = packs.get(index).getName();
-            checked[index] = packs.get(index).getId().equals(selectedPackId);
+        boolean visible = batchDeleteMode;
+        batchDeleteBar.setVisibility(visible ? View.VISIBLE : View.GONE);
+        batchDeleteCount.setText("已选择 " + selectedItemIds.size() + " 项");
+        batchDeleteButton.setEnabled(!selectedItemIds.isEmpty() && !importBusy);
+    }
+
+    private void exitBatchDeleteMode() {
+        if (!batchDeleteMode) {
+            return;
         }
+        clearBatchDeleteState();
+        gridAdapter.setSelectionMode(false, Collections.emptySet());
+        updateBatchDeleteBar();
+        renderGrid();
+    }
+
+    private void clearBatchDeleteState() {
+        batchDeleteMode = false;
+        batchDeletePackId = null;
+        selectedItemIds.clear();
+        if (gridAdapter != null) {
+            gridAdapter.setSelectionMode(false, Collections.emptySet());
+        }
+        updateBatchDeleteBar();
+    }
+
+    private void confirmBatchDeleteItems() {
+        if (selectedItemIds.isEmpty() || batchDeletePackId == null) {
+            toast("请至少选择一个表情包");
+            return;
+        }
+        String packId = batchDeletePackId;
+        List<String> itemIds = new ArrayList<>(selectedItemIds);
         new AlertDialog.Builder(this)
-                .setTitle("批量移除表情包")
-                .setMultiChoiceItems(labels, checked,
-                        (dialog, which, value) -> checked[which] = value)
+                .setTitle("删除已勾选表情包")
+                .setMessage("只从当前类移除勾选项，不删除手机相册中的源文件，也不影响其他类。")
                 .setNegativeButton("取消", null)
-                .setPositiveButton("移除", (dialog, which) -> {
-                    List<String> ids = new ArrayList<>();
-                    for (int index = 0; index < checked.length; index++) {
-                        if (checked[index]) {
-                            ids.add(packs.get(index).getId());
-                        }
-                    }
-                    if (ids.isEmpty()) {
-                        toast("请至少选择一个表情包");
-                        return;
-                    }
+                .setPositiveButton("删除", (dialog, which) -> {
                     try {
-                        EmojiFileStore.unlinkPacksFromGallery(this, selectedGalleryId, ids);
-                        reloadCatalog(selectedGalleryId, null);
+                        EmojiFileStore.deleteItems(this, packId, itemIds);
+                        exitBatchDeleteMode();
+                        reloadCatalog(selectedGalleryId, packId);
                     } catch (Exception exception) {
-                        operationFailed("批量移除失败", exception);
+                        operationFailed("批量删除失败", exception);
                     }
                 })
                 .show();
@@ -575,6 +654,22 @@ public class MainActivity extends AppCompatActivity {
                 operationFailed("重命名失败", exception);
             }
         });
+    }
+
+    private void confirmDeletePack(EmojiCatalog.Pack pack) {
+        new AlertDialog.Builder(this)
+                .setTitle("删除该类")
+                .setMessage("只删除该类及应用托管副本，不删除手机相册源文件，也不影响其他类中的同图；此操作无法撤销。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("删除", (dialog, which) -> {
+                    try {
+                        EmojiFileStore.deletePack(this, pack.getId());
+                        reloadCatalog(selectedGalleryId, null);
+                    } catch (Exception exception) {
+                        operationFailed("删除类失败", exception);
+                    }
+                })
+                .show();
     }
 
     private void showItemActions(EmojiCatalog.Item item) {
@@ -672,7 +767,7 @@ public class MainActivity extends AppCompatActivity {
     private void confirmDeleteItem(EmojiCatalog.Item item) {
         new AlertDialog.Builder(this)
                 .setTitle("移除表情")
-                .setMessage("确定移除“" + item.getName() + "”？表情库中必须至少保留一张图片。")
+                .setMessage("只从当前类移除“" + item.getName() + "”，不删除手机相册源文件，也不影响其他类中的同图。")
                 .setNegativeButton("取消", null)
                 .setPositiveButton("移除", (dialog, which) -> {
                     try {

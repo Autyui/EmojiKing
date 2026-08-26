@@ -267,6 +267,39 @@ public final class LocalEmojiCatalogRepository {
         discardStaged(Collections.singletonList(staged));
     }
 
+    public synchronized void deleteItems(String packId, List<String> itemIds) throws IOException {
+        EmojiCatalog current = requireCatalog();
+        EmojiCatalog.Pack pack = requirePack(current, packId);
+        List<String> ids = uniqueRequiredIds(itemIds, "emoji");
+        List<EmojiCatalog.Item> selectedItems = new ArrayList<>();
+        for (String itemId : ids) {
+            EmojiCatalog.Item selected = null;
+            for (EmojiCatalog.Item item : pack.getItems()) {
+                if (itemId.equals(item.getId())) {
+                    selected = item;
+                    break;
+                }
+            }
+            if (selected == null) {
+                throw new IOException("Emoji does not exist in the selected emoji pack: " + itemId);
+            }
+            selectedItems.add(selected);
+        }
+        if (countItems(current) - selectedItems.size() <= 0) {
+            throw new IOException("At least one emoji must remain in the catalog");
+        }
+
+        EmojiCatalog updated = EmojiCatalogEditor.removeItems(current, packId, ids);
+        List<StagedFile> staged = stageFiles(selectedItems);
+        try {
+            catalogFile.write(codec.encode(updated));
+        } catch (IOException exception) {
+            restoreStaged(staged, exception);
+            throw exception;
+        }
+        discardStaged(staged);
+    }
+
     public synchronized EmojiCatalog loadCatalog() throws IOException {
         return requireCatalog();
     }

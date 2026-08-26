@@ -245,6 +245,13 @@ public final class EmojiFileStore {
         repository(context).deleteItem(itemId);
     }
 
+    public static synchronized void deleteItems(
+            Context context,
+            String packId,
+            List<String> itemIds) throws IOException {
+        repository(context).deleteItems(packId, itemIds);
+    }
+
     public static String getMimeType(File file) {
         String name = file.getName().toLowerCase(Locale.US);
         if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {

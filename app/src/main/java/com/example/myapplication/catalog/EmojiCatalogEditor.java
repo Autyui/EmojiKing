@@ -196,6 +196,28 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, catalog.getGalleries(), packs);
     }
 
+    static EmojiCatalog removeItems(
+            EmojiCatalog catalog,
+            String packId,
+            List<String> itemIds) {
+        List<EmojiCatalog.Pack> packs = new ArrayList<>();
+        boolean changed = false;
+        for (EmojiCatalog.Pack pack : catalog.getPacks()) {
+            List<EmojiCatalog.Item> items = new ArrayList<>();
+            for (EmojiCatalog.Item item : pack.getItems()) {
+                boolean remove = packId.equals(pack.getId()) && itemIds.contains(item.getId());
+                if (remove) {
+                    changed = true;
+                } else {
+                    items.add(item);
+                }
+            }
+            packs.add(copyPack(pack, items));
+        }
+        requireChanged(changed, "No selected emoji exists in the emoji pack");
+        return rebuild(catalog, catalog.getGalleries(), packs);
+    }
+
     private static EmojiCatalog rebuild(
             EmojiCatalog catalog,
             List<EmojiCatalog.Gallery> galleries,
