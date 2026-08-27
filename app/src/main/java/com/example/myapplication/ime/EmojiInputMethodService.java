@@ -46,7 +46,8 @@ import java.util.concurrent.Executors;
 
 /** Chinese text keyboard and local emoji browser sharing one fixed input surface. */
 public class EmojiInputMethodService extends InputMethodService {
-    private static final int CANDIDATE_LIMIT = 8;
+    private static final int CANDIDATE_LIMIT = 15;
+    private static final int EXPANDED_CANDIDATE_COLUMNS = 3;
     private static final int INPUT_HEIGHT_DP = 304;
     private static final int TOOLBAR_HEIGHT_DP = 46;
     private static final int LETTER_AREA_HEIGHT_DP = 196;
@@ -58,6 +59,7 @@ public class EmojiInputMethodService extends InputMethodService {
     private LinearLayout contentContainer;
     private ImageView keyboardBackground;
     private Button modeSwitch;
+    private Button candidateExpandButton;
     private TextView toolbarStatus;
     private View emojiPanelView;
     private LinearLayout galleryRail;
@@ -91,6 +93,7 @@ public class EmojiInputMethodService extends InputMethodService {
     private List<String> currentCandidates = Collections.emptyList();
     private String currentCandidatePinyin = "";
     private boolean chooseFirstPending;
+    private boolean candidateExpanded;
 
     @Override
     public void onCreate() {
@@ -140,6 +143,7 @@ public class EmojiInputMethodService extends InputMethodService {
             englishMode = false;
             englishUppercase = false;
             textPage = 0;
+            candidateExpanded = false;
             pinyinBuffer.setLength(0);
             refreshInputMode();
         });
@@ -170,6 +174,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
         candidateGeneration++;
         chooseFirstPending = false;
+        candidateExpanded = false;
         currentCandidates = Collections.emptyList();
         currentCandidatePinyin = "";
         applySurfaceTheme();
@@ -187,6 +192,9 @@ public class EmojiInputMethodService extends InputMethodService {
         if (textMode) {
             contentContainer.addView(createTextPanel(), new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+            if (textPage == 0) {
+                renderCandidates();
+            }
         } else {
             if (emojiPanelView == null) {
                 emojiPanelView = createEmojiPanel();
@@ -201,6 +209,7 @@ public class EmojiInputMethodService extends InputMethodService {
         candidateScroll = null;
         candidateStrip = null;
         composingLabel = null;
+        candidateExpandButton = null;
 
         if (textMode && textPage == 0) {
             composingLabel = label("", 13);
@@ -220,6 +229,19 @@ public class EmojiInputMethodService extends InputMethodService {
             candidateScroll.addView(candidateStrip, matchWrap());
             toolbarBody.addView(candidateScroll, new LinearLayout.LayoutParams(
                     0, dp(42), 1f));
+
+            candidateExpandButton = button("▼", "展开全部候选词",
+                    view -> setCandidateExpanded(!candidateExpanded));
+            candidateExpandButton.setTextSize(17);
+            candidateExpandButton.setTextColor(primaryTextColor());
+            candidateExpandButton.setBackground(borderlessKeyBackground());
+            if (customBackgroundActive) {
+                candidateExpandButton.setShadowLayer(3f, 0f, 1f, Color.BLACK);
+            }
+            candidateExpandButton.setEnabled(false);
+            candidateExpandButton.setVisibility(View.INVISIBLE);
+            toolbarBody.addView(candidateExpandButton, new LinearLayout.LayoutParams(
+                    dp(42), dp(42)));
         }
 
         toolbarStatus = label("", 11);
@@ -227,10 +249,10 @@ public class EmojiInputMethodService extends InputMethodService {
         toolbarStatus.setSingleLine(true);
         toolbarStatus.setEllipsize(TextUtils.TruncateAt.END);
         toolbarStatus.setPadding(dp(4), 0, dp(6), 0);
-        toolbarBody.addView(toolbarStatus, new LinearLayout.LayoutParams(
-                textMode && textPage == 0 ? dp(68) : 0,
-                dp(42),
-                textMode && textPage == 0 ? 0f : 1f));
+        if (!textMode || textPage != 0) {
+            toolbarBody.addView(toolbarStatus, new LinearLayout.LayoutParams(
+                    0, dp(42), 1f));
+        }
         updateToolbarStatus();
     }
 
@@ -459,7 +481,6 @@ public class EmojiInputMethodService extends InputMethodService {
         addControlKey(controls, "回车", "换行", view -> sendEnter(), 1.0f);
         panel.addView(controls, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(CONTROL_ROW_HEIGHT_DP)));
-        renderCandidates();
         return panel;
     }
 
@@ -477,9 +498,11 @@ public class EmojiInputMethodService extends InputMethodService {
             addLetterKey(row, key, baseKey);
         }
         if (withBackspace) {
+            View deleteGap = new View(this);
+            row.addView(deleteGap, new LinearLayout.LayoutParams(0, 1, 0.45f));
             addControlKey(row, "删", "删除拼音或前一个字符", view -> deleteLast(), 1f);
         }
-        if (insetWeight > 0f) {
+        if (insetWeight > 0f && !withBackspace) {
             View inset = new View(this);
             row.addView(inset, new LinearLayout.LayoutParams(0, 1, insetWeight));
         }
@@ -614,8 +637,12 @@ public class EmojiInputMethodService extends InputMethodService {
         currentCandidates = Collections.emptyList();
         currentCandidatePinyin = "";
         candidateStrip.removeAllViews();
+        updateCandidateExpandButton(false);
         if (pinyin.isEmpty()) {
             chooseFirstPending = false;
+            if (candidateExpanded) {
+                setCandidateExpanded(false);
+            }
             return;
         }
         if (pinyinDictionary == null) {
@@ -640,6 +667,25 @@ public class EmojiInputMethodService extends InputMethodService {
         }
         currentCandidates = candidates;
         currentCandidatePinyin = pinyin;
+        renderCandidateButtons(candidates);
+        updateCandidateExpandButton(!candidates.isEmpty());
+        if (candidateExpanded) {
+            showExpandedCandidatePanel();
+        }
+        if (chooseFirstPending) {
+            chooseFirstPending = false;
+            if (candidates.isEmpty()) {
+                commitPinyin();
+            } else {
+                commitCandidate(candidates.get(0));
+            }
+        }
+    }
+
+    private void renderCandidateButtons(List<String> candidates) {
+        if (candidateStrip == null) {
+            return;
+        }
         candidateStrip.removeAllViews();
         for (String candidate : candidates) {
             Button button = button(candidate, "选择候选词" + candidate,
@@ -653,18 +699,86 @@ public class EmojiInputMethodService extends InputMethodService {
         if (candidates.isEmpty()) {
             candidateStrip.addView(label("无候选", 12), new LinearLayout.LayoutParams(dp(70), dp(42)));
         }
-        if (chooseFirstPending) {
-            chooseFirstPending = false;
-            if (candidates.isEmpty()) {
-                commitPinyin();
-            } else {
-                commitCandidate(candidates.get(0));
-            }
+    }
+
+    private void updateCandidateExpandButton(boolean hasCandidates) {
+        if (candidateExpandButton == null) {
+            return;
         }
+        candidateExpandButton.setVisibility(hasCandidates ? View.VISIBLE : View.INVISIBLE);
+        candidateExpandButton.setEnabled(hasCandidates);
+        candidateExpandButton.setText(candidateExpanded ? "▲" : "▼");
+        candidateExpandButton.setContentDescription(
+                candidateExpanded ? "收起候选词" : "展开全部候选词");
+    }
+
+    private void setCandidateExpanded(boolean expanded) {
+        boolean canExpand = textMode && textPage == 0
+                && !currentCandidates.isEmpty()
+                && pinyinBuffer.toString().equals(currentCandidatePinyin);
+        candidateExpanded = expanded && canExpand;
+        updateCandidateExpandButton(canExpand);
+        if (contentContainer == null) {
+            return;
+        }
+        contentContainer.removeAllViews();
+        contentContainer.addView(
+                candidateExpanded ? createExpandedCandidatePanel() : createTextPanel(),
+                new LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private void showExpandedCandidatePanel() {
+        if (!candidateExpanded || contentContainer == null) {
+            return;
+        }
+        contentContainer.removeAllViews();
+        contentContainer.addView(createExpandedCandidatePanel(), new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+    private View createExpandedCandidatePanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(dp(6), dp(4), dp(6), dp(4));
+        panel.setBackground(unifiedLetterAreaBackground());
+        int rowCount = (CANDIDATE_LIMIT + EXPANDED_CANDIDATE_COLUMNS - 1)
+                / EXPANDED_CANDIDATE_COLUMNS;
+        for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
+            int start = rowIndex * EXPANDED_CANDIDATE_COLUMNS;
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            for (int column = 0; column < EXPANDED_CANDIDATE_COLUMNS; column++) {
+                int index = start + column;
+                if (index < currentCandidates.size()) {
+                    String candidate = currentCandidates.get(index);
+                    Button button = button(candidate, "选择候选词" + candidate,
+                            view -> commitCandidate(candidate));
+                    button.setTextSize(18);
+                    button.setTextColor(primaryTextColor());
+                    button.setSingleLine(true);
+                    button.setEllipsize(TextUtils.TruncateAt.END);
+                    button.setBackground(borderlessKeyBackground());
+                    if (customBackgroundActive) {
+                        button.setShadowLayer(3f, 0f, 1f, Color.BLACK);
+                    }
+                    row.addView(button, new LinearLayout.LayoutParams(
+                            0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+                } else {
+                    row.addView(new View(this), new LinearLayout.LayoutParams(
+                            0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
+                }
+            }
+            panel.addView(row, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        }
+        return panel;
     }
 
     private void showCandidateMessage(String message) {
         candidateStrip.removeAllViews();
+        updateCandidateExpandButton(false);
         candidateStrip.addView(label(message, 12),
                 new LinearLayout.LayoutParams(dp(110), dp(40)));
     }
@@ -696,6 +810,9 @@ public class EmojiInputMethodService extends InputMethodService {
             pinyinDictionary.recordSelection(candidate);
         }
         chooseFirstPending = false;
+        if (candidateExpanded) {
+            setCandidateExpanded(false);
+        }
         pinyinBuffer.setLength(0);
         renderCandidates();
     }
@@ -709,6 +826,9 @@ public class EmojiInputMethodService extends InputMethodService {
             connection.commitText(pinyinBuffer.toString(), 1);
         }
         chooseFirstPending = false;
+        if (candidateExpanded) {
+            setCandidateExpanded(false);
+        }
         pinyinBuffer.setLength(0);
         renderCandidates();
     }
@@ -747,6 +867,9 @@ public class EmojiInputMethodService extends InputMethodService {
             pinyinBuffer.setLength(0);
             currentCandidates = Collections.emptyList();
             currentCandidatePinyin = "";
+            if (candidateExpanded) {
+                setCandidateExpanded(false);
+            }
         }
         updateCompatibilityStatus(attribute);
     }

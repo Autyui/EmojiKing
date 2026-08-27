@@ -59,6 +59,29 @@ public class PinyinDictionaryTest {
         assertEquals(Arrays.asList("学习", "常用"), dictionary.query("ni", 2));
     }
 
+    @Test
+    public void completeSyllableDoesNotMergeSeparateLetterEntries() {
+        Map<String, List<PinyinDictionary.Entry>> entries = new HashMap<>();
+        entries.put("ru", Collections.singletonList(entry("如", 100)));
+        entries.put("r", Collections.singletonList(entry("人", 90)));
+        entries.put("u", Collections.singletonList(entry("有", 80)));
+        PinyinDictionary dictionary = dictionary(entries);
+
+        assertEquals(Collections.singletonList("如"), dictionary.query("ru", 15));
+    }
+
+    @Test
+    public void queryCanReturnFifteenCandidates() {
+        Map<String, List<PinyinDictionary.Entry>> entries = new HashMap<>();
+        List<PinyinDictionary.Entry> candidates = new java.util.ArrayList<>();
+        for (int index = 0; index < 20; index++) {
+            candidates.add(entry("候选" + index, 100 - index));
+        }
+        entries.put("houxuan", candidates);
+
+        assertEquals(15, dictionary(entries).query("houxuan", 15).size());
+    }
+
     private static PinyinDictionary dictionary(
             Map<String, List<PinyinDictionary.Entry>> entries) {
         return new PinyinDictionary(
