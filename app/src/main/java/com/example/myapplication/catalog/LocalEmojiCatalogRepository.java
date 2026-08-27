@@ -28,6 +28,7 @@ public final class LocalEmojiCatalogRepository {
     private final File imagesDirectory;
     private final EmojiCatalogJsonCodec codec;
     private final AtomicTextFile catalogFile;
+    private EmojiCatalog cachedCatalog;
 
     public LocalEmojiCatalogRepository(File applicationFilesDirectory) {
         this(new File(applicationFilesDirectory, LIBRARY_DIRECTORY),
@@ -133,14 +134,13 @@ public final class LocalEmojiCatalogRepository {
                 name,
                 nextGalleryOrder(current),
                 Collections.emptyList());
-        catalogFile.write(codec.encode(EmojiCatalogEditor.addGallery(current, gallery)));
+        writeCatalog(EmojiCatalogEditor.addGallery(current, gallery));
         return gallery;
     }
 
     public synchronized void renameGallery(String galleryId, String name) throws IOException {
         EmojiCatalog current = requireCatalog();
-        catalogFile.write(codec.encode(
-                EmojiCatalogEditor.renameGallery(current, galleryId, name)));
+        writeCatalog(EmojiCatalogEditor.renameGallery(current, galleryId, name));
     }
 
     public synchronized void deleteGallery(String galleryId) throws IOException {
@@ -148,8 +148,7 @@ public final class LocalEmojiCatalogRepository {
         if (current.getGalleries().size() <= 1) {
             throw new IOException("At least one gallery must remain");
         }
-        catalogFile.write(codec.encode(
-                EmojiCatalogEditor.removeGallery(current, galleryId)));
+        writeCatalog(EmojiCatalogEditor.removeGallery(current, galleryId));
     }
 
     public synchronized EmojiCatalog.Pack createPack(String galleryId, String name)
@@ -179,7 +178,7 @@ public final class LocalEmojiCatalogRepository {
             updated = EmojiCatalogEditor.addPack(updated, pack, targets);
             created.add(pack);
         }
-        catalogFile.write(codec.encode(updated));
+        writeCatalog(updated);
         return Collections.unmodifiableList(created);
     }
 
@@ -195,7 +194,7 @@ public final class LocalEmojiCatalogRepository {
                     packId,
                     Collections.singletonList(galleryId));
         }
-        catalogFile.write(codec.encode(updated));
+        writeCatalog(updated);
     }
 
     public synchronized void unlinkPackFromGallery(String galleryId, String packId)
@@ -212,12 +211,12 @@ public final class LocalEmojiCatalogRepository {
             requirePack(updated, packId);
             updated = EmojiCatalogEditor.unlinkPack(updated, galleryId, packId);
         }
-        catalogFile.write(codec.encode(updated));
+        writeCatalog(updated);
     }
 
     public synchronized void renamePack(String packId, String name) throws IOException {
         EmojiCatalog current = requireCatalog();
-        catalogFile.write(codec.encode(EmojiCatalogEditor.renamePack(current, packId, name)));
+        writeCatalog(EmojiCatalogEditor.renamePack(current, packId, name));
     }
 
     public synchronized void deletePack(String packId) throws IOException {
@@ -232,7 +231,7 @@ public final class LocalEmojiCatalogRepository {
         EmojiCatalog updated = EmojiCatalogEditor.removePack(current, packId);
         List<StagedFile> staged = stageFiles(pack.getItems());
         try {
-            catalogFile.write(codec.encode(updated));
+            writeCatalog(updated);
         } catch (IOException exception) {
             restoreStaged(staged, exception);
             throw exception;
@@ -246,8 +245,7 @@ public final class LocalEmojiCatalogRepository {
         EmojiCatalog.Item updatedItem = new EmojiCatalog.Item(
                 item.getId(), item.getName(), note, item.getMimeType(),
                 item.getRelativePath(), item.getSortOrder());
-        catalogFile.write(codec.encode(
-                EmojiCatalogEditor.replaceItem(current, itemId, updatedItem)));
+        writeCatalog(EmojiCatalogEditor.replaceItem(current, itemId, updatedItem));
     }
 
     public synchronized void deleteItem(String itemId) throws IOException {
@@ -259,7 +257,7 @@ public final class LocalEmojiCatalogRepository {
         EmojiCatalog updated = EmojiCatalogEditor.removeItem(current, itemId);
         StagedFile staged = stageFile(resolveImageFile(item));
         try {
-            catalogFile.write(codec.encode(updated));
+            writeCatalog(updated);
         } catch (IOException exception) {
             restoreStaged(Collections.singletonList(staged), exception);
             throw exception;
@@ -292,7 +290,7 @@ public final class LocalEmojiCatalogRepository {
         EmojiCatalog updated = EmojiCatalogEditor.removeItems(current, packId, ids);
         List<StagedFile> staged = stageFiles(selectedItems);
         try {
-            catalogFile.write(codec.encode(updated));
+            writeCatalog(updated);
         } catch (IOException exception) {
             restoreStaged(staged, exception);
             throw exception;
@@ -332,13 +330,17 @@ public final class LocalEmojiCatalogRepository {
     }
 
     private EmojiCatalog loadCatalogOrNull() throws IOException {
+        if (cachedCatalog != null) {
+            return cachedCatalog;
+        }
         String json = catalogFile.readOrNull();
         if (json == null) {
             return null;
         }
         EmojiCatalog catalog = codec.decode(json);
         validateCatalogFiles(catalog);
-        return catalog;
+        cachedCatalog = catalog;
+        return cachedCatalog;
     }
 
     private EmojiCatalog migrateLegacyImage(File legacyImage, String mimeType) throws IOException {
@@ -364,11 +366,16 @@ public final class LocalEmojiCatalogRepository {
 
     private void commitWithNewFile(EmojiCatalog catalog, File newFile) throws IOException {
         try {
-            catalogFile.write(codec.encode(catalog));
+            writeCatalog(catalog);
         } catch (IOException exception) {
             deleteQuietly(newFile);
             throw exception;
         }
+    }
+
+    private void writeCatalog(EmojiCatalog catalog) throws IOException {
+        catalogFile.write(codec.encode(catalog));
+        cachedCatalog = catalog;
     }
 
     private ManagedImage copyManagedImage(

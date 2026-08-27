@@ -4,6 +4,8 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -21,6 +23,8 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /** Fixed-size local thumbnail grid shared by the app and input method. */
 public final class EmojiGridAdapter extends BaseAdapter {
@@ -28,9 +32,15 @@ public final class EmojiGridAdapter extends BaseAdapter {
     private final int cellHeight;
     private final int targetPixels;
     private final LruCache<String, Bitmap> thumbnails;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService decodeExecutor = Executors.newFixedThreadPool(2);
+    private final Set<String> pendingKeys = new HashSet<>();
+    private final Set<String> brokenKeys = new HashSet<>();
     private List<EmojiCatalog.Item> items = new ArrayList<>();
     private boolean selectionMode;
     private Set<String> selectedIds = Collections.emptySet();
+    private boolean refreshScheduled;
+    private boolean released;
 
     public EmojiGridAdapter(Context context, int cellHeightDp, int targetSizeDp) {
         this.context = context;
@@ -50,6 +60,13 @@ public final class EmojiGridAdapter extends BaseAdapter {
     public void setItems(List<EmojiCatalog.Item> items) {
         this.items = new ArrayList<>(items);
         notifyDataSetChanged();
+    }
+
+    public void release() {
+        released = true;
+        decodeExecutor.shutdownNow();
+        mainHandler.removeCallbacksAndMessages(null);
+        pendingKeys.clear();
     }
 
     public void setSelectionMode(boolean enabled, Set<String> selectedIds) {
@@ -85,26 +102,16 @@ public final class EmojiGridAdapter extends BaseAdapter {
         EmojiCatalog.Item item = getItem(position);
         image.setContentDescription(item.getName());
         image.setImageDrawable(null);
-        try {
-            String cacheKey = item.getId() + ":" + item.getRelativePath();
-            Bitmap bitmap = thumbnails.get(cacheKey);
-            if (bitmap == null) {
-                bitmap = decodeThumbnail(
-                        EmojiFileStore.getManagedFile(context, item).getAbsolutePath(),
-                        targetPixels);
-                if (bitmap != null) {
-                    thumbnails.put(cacheKey, bitmap);
-                }
-            }
-            if (bitmap == null) {
-                image.setImageResource(android.R.drawable.ic_menu_report_image);
-                image.setContentDescription(item.getName() + "，图片损坏");
-            } else {
-                image.setImageBitmap(bitmap);
-            }
-        } catch (Exception exception) {
+        String cacheKey = item.getId() + ":" + item.getRelativePath() + ":" + targetPixels;
+        Bitmap bitmap = thumbnails.get(cacheKey);
+        if (bitmap != null) {
+            image.setImageBitmap(bitmap);
+        } else if (brokenKeys.contains(cacheKey)) {
             image.setImageResource(android.R.drawable.ic_menu_report_image);
             image.setContentDescription(item.getName() + "，图片不可用");
+        } else {
+            image.setImageResource(android.R.drawable.ic_menu_gallery);
+            scheduleThumbnail(item, cacheKey);
         }
         boolean selected = selectedIds.contains(item.getId());
         checkBox.setVisibility(selectionMode ? View.VISIBLE : View.GONE);
@@ -113,6 +120,48 @@ public final class EmojiGridAdapter extends BaseAdapter {
         cell.setBackgroundColor(selectionMode && selected ? 0xffdbeafe : Color.TRANSPARENT);
         cell.setContentDescription(item.getName() + (selectionMode ? "，点击切换勾选" : ""));
         return cell;
+    }
+
+    private void scheduleThumbnail(EmojiCatalog.Item item, String cacheKey) {
+        if (released || !pendingKeys.add(cacheKey)) {
+            return;
+        }
+        decodeExecutor.execute(() -> {
+            Bitmap bitmap = null;
+            try {
+                bitmap = decodeThumbnail(
+                        EmojiFileStore.getManagedFile(context, item).getAbsolutePath(),
+                        targetPixels);
+            } catch (Exception ignored) {
+                // The main thread displays the unavailable-image state.
+            }
+            Bitmap result = bitmap;
+            mainHandler.post(() -> completeThumbnail(cacheKey, result));
+        });
+    }
+
+    private void completeThumbnail(String cacheKey, Bitmap bitmap) {
+        pendingKeys.remove(cacheKey);
+        if (released) {
+            if (bitmap != null) {
+                bitmap.recycle();
+            }
+            return;
+        }
+        if (bitmap == null) {
+            brokenKeys.add(cacheKey);
+        } else {
+            thumbnails.put(cacheKey, bitmap);
+        }
+        if (!refreshScheduled) {
+            refreshScheduled = true;
+            mainHandler.postDelayed(() -> {
+                refreshScheduled = false;
+                if (!released) {
+                    notifyDataSetChanged();
+                }
+            }, 16L);
+        }
     }
 
     private FrameLayout createCell() {

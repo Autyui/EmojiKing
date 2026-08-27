@@ -1,18 +1,27 @@
 package com.example.myapplication.ime;
 
 import android.content.ClipDescription;
+import android.content.res.ColorStateList;
+import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.inputmethodservice.InputMethodService;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.GridView;
 import android.widget.HorizontalScrollView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -26,18 +35,31 @@ import com.example.myapplication.EmojiFileStore;
 import com.example.myapplication.EmojiGridAdapter;
 import com.example.myapplication.EmojiSelectionStore;
 import com.example.myapplication.ImageShareSender;
+import com.example.myapplication.KeyboardBackgroundStore;
 import com.example.myapplication.R;
 import com.example.myapplication.catalog.EmojiCatalog;
-import com.example.myapplication.catalog.LocalEmojiCatalogRepository;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-/** Multi-gallery emoji panel that preserves the standard commit/share policy. */
+/** Chinese text keyboard and local emoji browser sharing one fixed input surface. */
 public class EmojiInputMethodService extends InputMethodService {
     private static final int CANDIDATE_LIMIT = 8;
+    private static final int INPUT_HEIGHT_DP = 304;
+    private static final int TOOLBAR_HEIGHT_DP = 46;
+    private static final int LETTER_AREA_HEIGHT_DP = 196;
+    private static final int CONTROL_ROW_HEIGHT_DP = 62;
 
+    private LinearLayout keyboardSurface;
+    private LinearLayout toolbar;
+    private LinearLayout toolbarBody;
     private LinearLayout contentContainer;
+    private ImageView keyboardBackground;
+    private Button modeSwitch;
+    private TextView toolbarStatus;
+    private View emojiPanelView;
     private LinearLayout galleryRail;
     private LinearLayout packStrip;
     private EmojiGridAdapter gridAdapter;
@@ -56,6 +78,27 @@ public class EmojiInputMethodService extends InputMethodService {
     private LinearLayout candidateStrip;
     private TextView composingLabel;
     private PinyinDictionary pinyinDictionary;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private ExecutorService dictionaryExecutor;
+    private ExecutorService catalogExecutor;
+    private volatile int candidateGeneration;
+    private volatile int catalogGeneration;
+    private volatile int backgroundGeneration;
+    private volatile boolean destroyed;
+    private boolean customBackgroundActive;
+    private long loadedBackgroundVersion = Long.MIN_VALUE;
+    private Bitmap loadedBackgroundBitmap;
+    private List<String> currentCandidates = Collections.emptyList();
+    private String currentCandidatePinyin = "";
+    private boolean chooseFirstPending;
+
+    @Override
+    public void onCreate() {
+        super.onCreate();
+        dictionaryExecutor = Executors.newSingleThreadExecutor();
+        catalogExecutor = Executors.newSingleThreadExecutor();
+        preloadPinyinDictionary();
+    }
 
     @Override
     public boolean onEvaluateInputViewShown() {
@@ -64,18 +107,31 @@ public class EmojiInputMethodService extends InputMethodService {
     }
 
     @Override
-    public View onCreateInputView() {
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(surfaceColor());
-        root.setPadding(dp(4), dp(4), dp(4), dp(4));
+    public boolean onEvaluateFullscreenMode() {
+        return false;
+    }
 
-        LinearLayout header = new LinearLayout(this);
-        header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = label("EmojiKing", 13);
-        title.setGravity(Gravity.CENTER_VERTICAL);
-        header.addView(title, new LinearLayout.LayoutParams(0, dp(42), 1f));
-        Button switchMode = button("", "切换输入模式", view -> {
+    @Override
+    public View onCreateInputView() {
+        FrameLayout root = new FrameLayout(this);
+        root.setBackgroundColor(surfaceColor());
+        root.setMinimumHeight(dp(INPUT_HEIGHT_DP));
+
+        customBackgroundActive = KeyboardBackgroundStore.hasBackground(this);
+        keyboardBackground = new ImageView(this);
+        keyboardBackground.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        keyboardBackground.setContentDescription("自定义键盘背景");
+        root.addView(keyboardBackground, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(INPUT_HEIGHT_DP)));
+
+        keyboardSurface = new LinearLayout(this);
+        keyboardSurface.setOrientation(LinearLayout.VERTICAL);
+        keyboardSurface.setMinimumHeight(dp(INPUT_HEIGHT_DP));
+
+        toolbar = new LinearLayout(this);
+        toolbar.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.setPadding(dp(4), dp(2), dp(4), dp(2));
+        modeSwitch = button("☺", "切换到表情图库", view -> {
             InputConnection connection = getCurrentInputConnection();
             if (connection != null) {
                 connection.finishComposingText();
@@ -87,16 +143,24 @@ public class EmojiInputMethodService extends InputMethodService {
             pinyinBuffer.setLength(0);
             refreshInputMode();
         });
-        switchMode.setTag("modeSwitch");
-        header.addView(switchMode, new LinearLayout.LayoutParams(dp(78), dp(42)));
-        root.addView(header, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(46)));
+        modeSwitch.setTextSize(21);
+        toolbar.addView(modeSwitch, new LinearLayout.LayoutParams(dp(48), dp(42)));
+
+        toolbarBody = new LinearLayout(this);
+        toolbarBody.setGravity(Gravity.CENTER_VERTICAL);
+        toolbar.addView(toolbarBody, new LinearLayout.LayoutParams(0, dp(42), 1f));
+        keyboardSurface.addView(toolbar, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(TOOLBAR_HEIGHT_DP)));
 
         contentContainer = new LinearLayout(this);
         contentContainer.setOrientation(LinearLayout.VERTICAL);
-        root.addView(contentContainer, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        keyboardSurface.addView(contentContainer, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(INPUT_HEIGHT_DP - TOOLBAR_HEIGHT_DP)));
+        root.addView(keyboardSurface, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(INPUT_HEIGHT_DP)));
         refreshInputMode();
+        loadKeyboardBackgroundAsync();
         return root;
     }
 
@@ -104,21 +168,184 @@ public class EmojiInputMethodService extends InputMethodService {
         if (contentContainer == null) {
             return;
         }
-        View switchMode = ((ViewGroup) contentContainer.getParent()).getChildAt(0);
-        if (switchMode instanceof ViewGroup) {
-            View button = ((ViewGroup) switchMode).findViewWithTag("modeSwitch");
-            if (button instanceof Button) {
-                ((Button) button).setText(textMode ? "表情" : "文字");
-            }
+        candidateGeneration++;
+        chooseFirstPending = false;
+        currentCandidates = Collections.emptyList();
+        currentCandidatePinyin = "";
+        applySurfaceTheme();
+        modeSwitch.setText(textMode ? "☺" : "ABC");
+        modeSwitch.setContentDescription(textMode ? "切换到表情图库" : "返回文字键盘");
+        modeSwitch.setTextColor(primaryTextColor());
+        modeSwitch.setBackground(borderlessKeyBackground());
+        if (textMode && customBackgroundActive) {
+            modeSwitch.setShadowLayer(3f, 0f, 1f, Color.BLACK);
+        } else {
+            modeSwitch.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT);
         }
+        rebuildToolbar();
         contentContainer.removeAllViews();
         if (textMode) {
             contentContainer.addView(createTextPanel(), new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         } else {
-            contentContainer.addView(createEmojiPanel(), new LinearLayout.LayoutParams(
+            if (emojiPanelView == null) {
+                emojiPanelView = createEmojiPanel();
+            }
+            contentContainer.addView(emojiPanelView, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         }
+    }
+
+    private void rebuildToolbar() {
+        toolbarBody.removeAllViews();
+        candidateScroll = null;
+        candidateStrip = null;
+        composingLabel = null;
+
+        if (textMode && textPage == 0) {
+            composingLabel = label("", 13);
+            composingLabel.setTextColor(secondaryTextColor());
+            composingLabel.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+            composingLabel.setSingleLine(true);
+            composingLabel.setMaxWidth(dp(100));
+            composingLabel.setEllipsize(TextUtils.TruncateAt.END);
+            composingLabel.setPadding(dp(6), 0, dp(4), 0);
+            toolbarBody.addView(composingLabel, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)));
+
+            candidateScroll = new HorizontalScrollView(this);
+            candidateScroll.setHorizontalScrollBarEnabled(false);
+            candidateStrip = new LinearLayout(this);
+            candidateStrip.setGravity(Gravity.CENTER_VERTICAL);
+            candidateScroll.addView(candidateStrip, matchWrap());
+            toolbarBody.addView(candidateScroll, new LinearLayout.LayoutParams(
+                    0, dp(42), 1f));
+        }
+
+        toolbarStatus = label("", 11);
+        toolbarStatus.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
+        toolbarStatus.setSingleLine(true);
+        toolbarStatus.setEllipsize(TextUtils.TruncateAt.END);
+        toolbarStatus.setPadding(dp(4), 0, dp(6), 0);
+        toolbarBody.addView(toolbarStatus, new LinearLayout.LayoutParams(
+                textMode && textPage == 0 ? dp(68) : 0,
+                dp(42),
+                textMode && textPage == 0 ? 0f : 1f));
+        updateToolbarStatus();
+    }
+
+    private void applySurfaceTheme() {
+        boolean showBackground = textMode && customBackgroundActive;
+        keyboardBackground.setVisibility(showBackground ? View.VISIBLE : View.GONE);
+        keyboardSurface.setBackgroundColor(showBackground ? Color.TRANSPARENT : surfaceColor());
+        toolbar.setBackgroundColor(showBackground ? 0x22000000 : toolbarColor());
+    }
+
+    private void preloadPinyinDictionary() {
+        dictionaryExecutor.execute(() -> {
+            PinyinDictionary loaded = PinyinDictionary.load(getApplicationContext());
+            mainHandler.post(() -> {
+                if (destroyed) {
+                    return;
+                }
+                pinyinDictionary = loaded;
+                updateToolbarStatus();
+                if (textMode && pinyinBuffer.length() > 0) {
+                    renderCandidates();
+                }
+            });
+        });
+    }
+
+    private void loadKeyboardBackgroundAsync() {
+        if (keyboardBackground == null || catalogExecutor == null) {
+            return;
+        }
+        int generation = ++backgroundGeneration;
+        long version = KeyboardBackgroundStore.version(this);
+        if (version == loadedBackgroundVersion) {
+            applySurfaceTheme();
+            return;
+        }
+        if (version == 0L) {
+            applyKeyboardBackground(generation, version, null);
+            return;
+        }
+        catalogExecutor.execute(() -> {
+            Bitmap bitmap = KeyboardBackgroundStore.load(getApplicationContext());
+            mainHandler.post(() -> applyKeyboardBackground(generation, version, bitmap));
+        });
+    }
+
+    private void applyKeyboardBackground(int generation, long version, Bitmap bitmap) {
+        if (destroyed || generation != backgroundGeneration) {
+            if (bitmap != null) {
+                bitmap.recycle();
+            }
+            return;
+        }
+        Bitmap previous = loadedBackgroundBitmap;
+        boolean wasActive = customBackgroundActive;
+        loadedBackgroundBitmap = bitmap;
+        loadedBackgroundVersion = version;
+        customBackgroundActive = bitmap != null;
+        keyboardBackground.setImageBitmap(bitmap);
+        if (customBackgroundActive) {
+            keyboardBackground.setColorFilter(0x22000000);
+        } else {
+            keyboardBackground.clearColorFilter();
+        }
+        if (previous != null && previous != bitmap) {
+            previous.recycle();
+        }
+        if (wasActive != customBackgroundActive) {
+            refreshInputMode();
+        } else {
+            applySurfaceTheme();
+        }
+    }
+
+    private void updateToolbarStatus() {
+        if (toolbarStatus == null) {
+            return;
+        }
+        if (!textMode) {
+            toolbarStatus.setText("表情图库");
+        } else if (englishMode) {
+            toolbarStatus.setText(englishUppercase ? "英文大写" : "英文");
+        } else if (pinyinDictionary == null) {
+            toolbarStatus.setText("中文 · 词库加载中");
+        } else if (pinyinDictionary.isEmpty()) {
+            toolbarStatus.setText("中文 · 词库不可用");
+        } else {
+            toolbarStatus.setText("中文");
+        }
+    }
+
+    @Override
+    public void onDestroy() {
+        destroyed = true;
+        candidateGeneration++;
+        catalogGeneration++;
+        backgroundGeneration++;
+        if (dictionaryExecutor != null) {
+            dictionaryExecutor.shutdownNow();
+        }
+        if (catalogExecutor != null) {
+            catalogExecutor.shutdownNow();
+        }
+        mainHandler.removeCallbacksAndMessages(null);
+        if (gridAdapter != null) {
+            gridAdapter.release();
+        }
+        if (keyboardBackground != null) {
+            keyboardBackground.setImageDrawable(null);
+        }
+        if (loadedBackgroundBitmap != null) {
+            loadedBackgroundBitmap.recycle();
+            loadedBackgroundBitmap = null;
+        }
+        super.onDestroy();
     }
 
     private View createEmojiPanel() {
@@ -196,7 +423,7 @@ public class EmojiInputMethodService extends InputMethodService {
         panel.addView(footer, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
 
-        reloadCatalog();
+        reloadCatalogAsync();
         return root;
     }
 
@@ -207,24 +434,15 @@ public class EmojiInputMethodService extends InputMethodService {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
 
-        candidateScroll = new HorizontalScrollView(this);
-        candidateScroll.setHorizontalScrollBarEnabled(false);
-        candidateStrip = new LinearLayout(this);
-        candidateStrip.setGravity(Gravity.CENTER_VERTICAL);
-        candidateScroll.addView(candidateStrip, matchWrap());
-        panel.addView(candidateScroll, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(24)));
-
-        composingLabel = label("", 12);
-        composingLabel.setTextColor(secondaryTextColor());
-        composingLabel.setGravity(Gravity.CENTER_VERTICAL);
-        composingLabel.setPadding(dp(10), 0, dp(10), 0);
-        panel.addView(composingLabel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(12)));
-
-        addKeyRow(panel, "QWERTYUIOP", 0.0f, false);
-        addKeyRow(panel, "ASDFGHJKL", 0.05f, false);
-        addKeyRow(panel, "ZXCVBNM", 0.10f, true);
+        LinearLayout letterArea = new LinearLayout(this);
+        letterArea.setOrientation(LinearLayout.VERTICAL);
+        letterArea.setPadding(dp(4), dp(2), dp(4), dp(2));
+        letterArea.setBackground(unifiedLetterAreaBackground());
+        addKeyRow(letterArea, "QWERTYUIOP", 0.0f, false);
+        addKeyRow(letterArea, "ASDFGHJKL", 0.50f, false);
+        addKeyRow(letterArea, "ZXCVBNM", 0.72f, true);
+        panel.addView(letterArea, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(LETTER_AREA_HEIGHT_DP)));
 
         LinearLayout controls = new LinearLayout(this);
         controls.setGravity(Gravity.CENTER);
@@ -240,7 +458,7 @@ public class EmojiInputMethodService extends InputMethodService {
         addControlKey(controls, "中英", "切换中文或英文输入", view -> toggleLanguage(), 1.0f);
         addControlKey(controls, "回车", "换行", view -> sendEnter(), 1.0f);
         panel.addView(controls, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(CONTROL_ROW_HEIGHT_DP)));
         renderCandidates();
         return panel;
     }
@@ -254,9 +472,9 @@ public class EmojiInputMethodService extends InputMethodService {
         }
         for (int index = 0; index < keys.length(); index++) {
             String baseKey = String.valueOf(keys.charAt(index));
-            String key = englishMode && !englishUppercase
+            String key = !englishMode || !englishUppercase
                     ? baseKey.toLowerCase(java.util.Locale.ROOT) : baseKey;
-            addControlKey(row, key, "输入字母" + key, view -> appendPinyin(baseKey), 1f);
+            addLetterKey(row, key, baseKey);
         }
         if (withBackspace) {
             addControlKey(row, "删", "删除拼音或前一个字符", view -> deleteLast(), 1f);
@@ -266,7 +484,19 @@ public class EmojiInputMethodService extends InputMethodService {
             row.addView(inset, new LinearLayout.LayoutParams(0, 1, insetWeight));
         }
         panel.addView(row, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+    }
+
+    private void addLetterKey(LinearLayout row, String text, String baseKey) {
+        Button key = button(text, "输入字母" + text, view -> appendPinyin(baseKey));
+        key.setTextSize(23);
+        key.setTextColor(primaryTextColor());
+        key.setBackground(borderlessKeyBackground());
+        if (textMode && customBackgroundActive) {
+            key.setShadowLayer(3f, 0f, 1f, Color.BLACK);
+        }
+        row.addView(key, new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
     }
 
     private View createSpecialPanel() {
@@ -298,7 +528,7 @@ public class EmojiInputMethodService extends InputMethodService {
                 addControlKey(row, value, "输入" + value, view -> commitText(value), 1f);
             }
             panel.addView(row, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(42)));
         }
         if (textPage == 2) {
             LinearLayout row = new LinearLayout(this);
@@ -306,7 +536,7 @@ public class EmojiInputMethodService extends InputMethodService {
             addControlKey(row, "删", "删除一个字符", view -> deleteLast(), 1f);
             addControlKey(row, "回车", "换行", view -> sendEnter(), 1f);
             panel.addView(row, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
         }
     }
 
@@ -324,10 +554,14 @@ public class EmojiInputMethodService extends InputMethodService {
             float weight) {
         Button key = button(text, description, listener);
         key.setTextSize(15);
-        key.setBackgroundColor(railColor());
+        key.setBackground(controlKeyBackground());
         key.setTextColor(primaryTextColor());
-        LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(0, dp(48), weight);
-        layout.setMargins(dp(1), dp(1), dp(1), dp(1));
+        if (textMode && customBackgroundActive) {
+            key.setShadowLayer(3f, 0f, 1f, Color.BLACK);
+        }
+        LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.MATCH_PARENT, weight);
+        layout.setMargins(dp(1), dp(2), dp(1), dp(2));
         row.addView(key, layout);
     }
 
@@ -360,8 +594,9 @@ public class EmojiInputMethodService extends InputMethodService {
             return;
         }
         InputConnection connection = getCurrentInputConnection();
-        if (connection != null) {
-            connection.deleteSurroundingText(1, 0);
+        if (connection != null && !connection.deleteSurroundingText(1, 0)) {
+            connection.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DEL));
+            connection.sendKeyEvent(new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DEL));
         }
     }
 
@@ -369,30 +604,69 @@ public class EmojiInputMethodService extends InputMethodService {
         if (candidateStrip == null || composingLabel == null) {
             return;
         }
-        candidateStrip.removeAllViews();
         String pinyin = pinyinBuffer.toString();
         composingLabel.setText(pinyin.isEmpty() && englishMode ? "英文" : pinyin);
         InputConnection connection = getCurrentInputConnection();
         if (connection != null) {
             connection.setComposingText(pinyin, 1);
         }
+        int generation = ++candidateGeneration;
+        currentCandidates = Collections.emptyList();
+        currentCandidatePinyin = "";
+        candidateStrip.removeAllViews();
         if (pinyin.isEmpty()) {
+            chooseFirstPending = false;
             return;
         }
         if (pinyinDictionary == null) {
-            pinyinDictionary = PinyinDictionary.load(this);
+            showCandidateMessage("词库加载中");
+            return;
         }
-        List<String> candidates = pinyinDictionary.query(pinyin, CANDIDATE_LIMIT);
+        showCandidateMessage("候选检索中");
+        dictionaryExecutor.execute(() -> {
+            if (destroyed || generation != candidateGeneration) {
+                return;
+            }
+            List<String> candidates = pinyinDictionary.query(pinyin, CANDIDATE_LIMIT);
+            mainHandler.post(() -> applyCandidateResult(generation, pinyin, candidates));
+        });
+    }
+
+    private void applyCandidateResult(int generation, String pinyin, List<String> candidates) {
+        if (destroyed || generation != candidateGeneration
+                || !textMode || !pinyin.equals(pinyinBuffer.toString())
+                || candidateStrip == null) {
+            return;
+        }
+        currentCandidates = candidates;
+        currentCandidatePinyin = pinyin;
+        candidateStrip.removeAllViews();
         for (String candidate : candidates) {
             Button button = button(candidate, "选择候选词" + candidate,
                     view -> commitCandidate(candidate));
             button.setTextSize(16);
+            button.setTextColor(primaryTextColor());
+            button.setBackground(borderlessKeyBackground());
             candidateStrip.addView(button, new LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT, dp(42)));
         }
         if (candidates.isEmpty()) {
             candidateStrip.addView(label("无候选", 12), new LinearLayout.LayoutParams(dp(70), dp(42)));
         }
+        if (chooseFirstPending) {
+            chooseFirstPending = false;
+            if (candidates.isEmpty()) {
+                commitPinyin();
+            } else {
+                commitCandidate(candidates.get(0));
+            }
+        }
+    }
+
+    private void showCandidateMessage(String message) {
+        candidateStrip.removeAllViews();
+        candidateStrip.addView(label(message, 12),
+                new LinearLayout.LayoutParams(dp(110), dp(40)));
     }
 
     private void chooseFirstCandidate() {
@@ -400,14 +674,16 @@ public class EmojiInputMethodService extends InputMethodService {
             commitText(" ");
             return;
         }
-        if (pinyinDictionary == null) {
-            pinyinDictionary = PinyinDictionary.load(this);
-        }
-        List<String> candidates = pinyinDictionary.query(pinyinBuffer.toString(), 1);
-        if (candidates.isEmpty()) {
-            commitPinyin();
+        String pinyin = pinyinBuffer.toString();
+        if (pinyin.equals(currentCandidatePinyin)) {
+            if (currentCandidates.isEmpty()) {
+                commitPinyin();
+            } else {
+                commitCandidate(currentCandidates.get(0));
+            }
         } else {
-            commitCandidate(candidates.get(0));
+            chooseFirstPending = true;
+            renderCandidates();
         }
     }
 
@@ -419,6 +695,7 @@ public class EmojiInputMethodService extends InputMethodService {
         if (pinyinDictionary != null) {
             pinyinDictionary.recordSelection(candidate);
         }
+        chooseFirstPending = false;
         pinyinBuffer.setLength(0);
         renderCandidates();
     }
@@ -431,6 +708,7 @@ public class EmojiInputMethodService extends InputMethodService {
         if (connection != null) {
             connection.commitText(pinyinBuffer.toString(), 1);
         }
+        chooseFirstPending = false;
         pinyinBuffer.setLength(0);
         renderCandidates();
     }
@@ -446,48 +724,87 @@ public class EmojiInputMethodService extends InputMethodService {
     private void sendEnter() {
         commitPinyin();
         InputConnection connection = getCurrentInputConnection();
-        if (connection != null) {
-            connection.sendKeyEvent(new android.view.KeyEvent(
-                    android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_ENTER));
+        EditorInfo editorInfo = getCurrentInputEditorInfo();
+        if (connection == null) {
+            return;
+        }
+        int options = editorInfo == null ? EditorInfo.IME_ACTION_NONE : editorInfo.imeOptions;
+        int action = options & EditorInfo.IME_MASK_ACTION;
+        boolean allowAction = (options & EditorInfo.IME_FLAG_NO_ENTER_ACTION) == 0
+                && action != EditorInfo.IME_ACTION_NONE
+                && action != EditorInfo.IME_ACTION_UNSPECIFIED;
+        if (!allowAction || !connection.performEditorAction(action)) {
+            connection.commitText("\n", 1);
         }
     }
 
     @Override
     public void onStartInput(EditorInfo attribute, boolean restarting) {
         super.onStartInput(attribute, restarting);
+        if (!restarting) {
+            candidateGeneration++;
+            chooseFirstPending = false;
+            pinyinBuffer.setLength(0);
+            currentCandidates = Collections.emptyList();
+            currentCandidatePinyin = "";
+        }
         updateCompatibilityStatus(attribute);
     }
 
     @Override
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
-        reloadCatalog();
+        loadKeyboardBackgroundAsync();
+        reloadCatalogAsync();
         updateCompatibilityStatus(info);
     }
 
-    private void reloadCatalog() {
+    private void reloadCatalogAsync() {
         if (galleryRail == null || packStrip == null || gridAdapter == null) {
             return;
         }
-        try {
-            catalog = EmojiFileStore.getCatalog(this);
-            EmojiSelectionStore.Selection selection = EmojiSelectionStore.resolve(this, catalog);
-            selectedGalleryId = selection.getGallery() == null
-                    ? null : selection.getGallery().getId();
-            selectedPackId = selection.getPack() == null ? null : selection.getPack().getId();
-            selectedItemId = firstItemId(selection.getPack());
-            renderCatalog();
-        } catch (Exception exception) {
-            catalog = null;
-            selectedGalleryId = null;
-            selectedPackId = null;
-            selectedItemId = null;
-            galleryRail.removeAllViews();
-            packStrip.removeAllViews();
-            gridAdapter.setItems(Collections.emptyList());
-            emptyState.setText("表情库读取失败");
-            setStatus("表情库读取失败");
+        int generation = ++catalogGeneration;
+        emptyState.setText("正在加载表情库");
+        catalogExecutor.execute(() -> {
+            try {
+                EmojiCatalog loaded = EmojiFileStore.getCatalog(this);
+                EmojiSelectionStore.Selection selection =
+                        EmojiSelectionStore.resolve(this, loaded);
+                mainHandler.post(() -> applyCatalogResult(generation, loaded, selection));
+            } catch (Exception exception) {
+                mainHandler.post(() -> applyCatalogFailure(generation));
+            }
+        });
+    }
+
+    private void applyCatalogResult(
+            int generation,
+            EmojiCatalog loaded,
+            EmojiSelectionStore.Selection selection) {
+        if (destroyed || generation != catalogGeneration) {
+            return;
         }
+        catalog = loaded;
+        selectedGalleryId = selection.getGallery() == null
+                ? null : selection.getGallery().getId();
+        selectedPackId = selection.getPack() == null ? null : selection.getPack().getId();
+        selectedItemId = firstItemId(selection.getPack());
+        renderCatalog();
+    }
+
+    private void applyCatalogFailure(int generation) {
+        if (destroyed || generation != catalogGeneration) {
+            return;
+        }
+        catalog = null;
+        selectedGalleryId = null;
+        selectedPackId = null;
+        selectedItemId = null;
+        galleryRail.removeAllViews();
+        packStrip.removeAllViews();
+        gridAdapter.setItems(Collections.emptyList());
+        emptyState.setText("表情库读取失败");
+        setStatus("表情库读取失败");
     }
 
     private void renderCatalog() {
@@ -573,9 +890,7 @@ public class EmojiInputMethodService extends InputMethodService {
             return;
         }
         try {
-            LocalEmojiCatalogRepository.StoredEmoji stored = EmojiFileStore.getStoredEmoji(
-                    this, item.getId());
-            Uri uri = EmojiFileStore.getUri(this, stored);
+            Uri uri = EmojiFileStore.getUri(this, item);
             String mimeType = item.getMimeType();
             if (ImageSendPolicy.initialAction(supportsMimeType(editorInfo, mimeType))
                     == ImageSendPolicy.InitialAction.COMMIT) {
@@ -596,7 +911,7 @@ public class EmojiInputMethodService extends InputMethodService {
             }
         } catch (Exception exception) {
             showResult("所选表情不可用");
-            reloadCatalog();
+            reloadCatalogAsync();
         }
     }
 
@@ -607,11 +922,9 @@ public class EmojiInputMethodService extends InputMethodService {
             return;
         }
         try {
-            LocalEmojiCatalogRepository.StoredEmoji stored = EmojiFileStore.getStoredEmoji(
-                    this, item.getId());
             shareImage(
                     getCurrentInputEditorInfo(),
-                    EmojiFileStore.getUri(this, stored),
+                    EmojiFileStore.getUri(this, item),
                     item.getMimeType(),
                     null);
         } catch (Exception exception) {
@@ -727,6 +1040,9 @@ public class EmojiInputMethodService extends InputMethodService {
         label.setTextSize(size);
         label.setTextColor(primaryTextColor());
         label.setGravity(Gravity.CENTER);
+        if (textMode && customBackgroundActive) {
+            label.setShadowLayer(3f, 0f, 1f, Color.BLACK);
+        }
         return label;
     }
 
@@ -742,7 +1058,11 @@ public class EmojiInputMethodService extends InputMethodService {
     }
 
     private int surfaceColor() {
-        return isNightMode() ? 0xff121212 : Color.WHITE;
+        return isNightMode() ? 0xff202124 : 0xffd9dde3;
+    }
+
+    private int toolbarColor() {
+        return isNightMode() ? 0xff24262a : Color.WHITE;
     }
 
     private int railColor() {
@@ -758,11 +1078,52 @@ public class EmojiInputMethodService extends InputMethodService {
     }
 
     private int primaryTextColor() {
+        if (textMode && customBackgroundActive) {
+            return Color.WHITE;
+        }
         return isNightMode() ? 0xfff2f2f2 : 0xff202124;
     }
 
     private int secondaryTextColor() {
+        if (textMode && customBackgroundActive) {
+            return 0xddffffff;
+        }
         return isNightMode() ? 0xffb7b7b7 : 0xff686b70;
+    }
+
+    private GradientDrawable unifiedLetterAreaBackground() {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(textMode && customBackgroundActive
+                ? 0x11000000
+                : (isNightMode() ? 0xff34363a : 0xfffafbfc));
+        background.setCornerRadius(textMode && customBackgroundActive ? 0f : dp(5));
+        return background;
+    }
+
+    private RippleDrawable borderlessKeyBackground() {
+        GradientDrawable content = new GradientDrawable();
+        content.setColor(Color.TRANSPARENT);
+        GradientDrawable mask = new GradientDrawable();
+        mask.setColor(Color.WHITE);
+        return new RippleDrawable(
+                ColorStateList.valueOf(isNightMode() ? 0x33ffffff : 0x22000000),
+                content,
+                mask);
+    }
+
+    private RippleDrawable controlKeyBackground() {
+        GradientDrawable content = new GradientDrawable();
+        content.setColor(textMode && customBackgroundActive
+                ? 0x26000000
+                : (isNightMode() ? 0xff45484e : 0xffc7cdd5));
+        content.setCornerRadius(dp(5));
+        GradientDrawable mask = new GradientDrawable();
+        mask.setColor(Color.WHITE);
+        mask.setCornerRadius(dp(5));
+        return new RippleDrawable(
+                ColorStateList.valueOf(isNightMode() ? 0x33ffffff : 0x22000000),
+                content,
+                mask);
     }
 
     private boolean isNightMode() {

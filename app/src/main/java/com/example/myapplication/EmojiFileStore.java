@@ -33,6 +33,8 @@ public final class EmojiFileStore {
     private static final int MAX_TREE_DOCUMENTS = 2_000;
     private static final String DIRECTORY = "emoji";
     private static final String FILE_PREFIX = "current.";
+    private static LocalEmojiCatalogRepository sharedRepository;
+    private static String sharedRepositoryRoot;
 
     private EmojiFileStore() {
     }
@@ -95,6 +97,13 @@ public final class EmojiFileStore {
                 context,
                 context.getPackageName() + ".fileprovider",
                 emoji.getFile());
+    }
+
+    public static Uri getUri(Context context, EmojiCatalog.Item item) throws IOException {
+        return androidx.core.content.FileProvider.getUriForFile(
+                context,
+                context.getPackageName() + ".fileprovider",
+                getManagedFile(context, item));
     }
 
     /** Compatibility entry point retained for the existing single-image flow. */
@@ -511,8 +520,13 @@ public final class EmojiFileStore {
         return directory;
     }
 
-    private static LocalEmojiCatalogRepository repository(Context context) {
-        return new LocalEmojiCatalogRepository(context.getFilesDir());
+    private static synchronized LocalEmojiCatalogRepository repository(Context context) {
+        String root = context.getApplicationContext().getFilesDir().getAbsolutePath();
+        if (sharedRepository == null || !root.equals(sharedRepositoryRoot)) {
+            sharedRepository = new LocalEmojiCatalogRepository(new File(root));
+            sharedRepositoryRoot = root;
+        }
+        return sharedRepository;
     }
 
     private static File createSample(File directory) {

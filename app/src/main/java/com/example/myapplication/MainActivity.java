@@ -53,6 +53,7 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_PICK_IMAGES = 1001;
     private static final int REQUEST_PICK_DIRECTORY = 1002;
     private static final int REQUEST_READ_IMAGES = 1003;
+    private static final int REQUEST_PICK_KEYBOARD_BACKGROUND = 1004;
 
     private final ExecutorService importExecutor = Executors.newSingleThreadExecutor();
     private final List<Button> busyControls = new ArrayList<>();
@@ -213,6 +214,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         importExecutor.shutdownNow();
+        if (gridAdapter != null) {
+            gridAdapter.release();
+        }
         super.onDestroy();
     }
 
@@ -792,6 +796,46 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, REQUEST_PICK_IMAGES);
     }
 
+    private void openKeyboardBackgroundPicker() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        startActivityForResult(intent, REQUEST_PICK_KEYBOARD_BACKGROUND);
+    }
+
+    private void saveKeyboardBackground(Uri source) {
+        setImportBusy(true, "正在保存键盘背景…");
+        importExecutor.execute(() -> {
+            try {
+                KeyboardBackgroundStore.save(this, source);
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    setImportBusy(false, null);
+                    toast("键盘背景已更新，重新打开输入法后生效");
+                });
+            } catch (Exception exception) {
+                runOnUiThread(() -> {
+                    if (isFinishing() || isDestroyed()) {
+                        return;
+                    }
+                    setImportBusy(false, null);
+                    operationFailed("保存键盘背景失败", exception);
+                });
+            }
+        });
+    }
+
+    private void clearKeyboardBackground() {
+        try {
+            boolean removed = KeyboardBackgroundStore.clear(this);
+            toast(removed ? "已恢复默认键盘背景" : "当前已经是默认键盘背景");
+        } catch (Exception exception) {
+            operationFailed("恢复默认背景失败", exception);
+        }
+    }
+
     private void requestDirectoryImport() {
         if (selectedPack() == null) {
             toast("请先添加并选择一个表情包");
@@ -868,6 +912,9 @@ public class MainActivity extends AppCompatActivity {
             if (!sources.isEmpty()) {
                 runImport(sources, selectedPackId);
             }
+        } else if (requestCode == REQUEST_PICK_KEYBOARD_BACKGROUND
+                && data.getData() != null) {
+            saveKeyboardBackground(data.getData());
         } else if (requestCode == REQUEST_PICK_DIRECTORY && data.getData() != null) {
             Uri treeUri = data.getData();
             if ((data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION) != 0) {
@@ -961,6 +1008,8 @@ public class MainActivity extends AppCompatActivity {
         new AlertDialog.Builder(this)
                 .setTitle("设置与导入")
                 .setItems(new String[]{
+                        "选择键盘背景",
+                        "恢复默认键盘背景",
                         "从授权目录导入",
                         "申请共享图片读取权限",
                         "打开系统输入法设置",
@@ -969,18 +1018,22 @@ public class MainActivity extends AppCompatActivity {
                         "云端"
                 }, (dialog, which) -> {
                     if (which == 0) {
-                        requestDirectoryImport();
+                        openKeyboardBackgroundPicker();
                     } else if (which == 1) {
-                        requestSharedImageAccess();
+                        clearKeyboardBackground();
                     } else if (which == 2) {
-                        startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS));
+                        requestDirectoryImport();
                     } else if (which == 3) {
+                        requestSharedImageAccess();
+                    } else if (which == 4) {
+                        startActivity(new Intent(Settings.ACTION_INPUT_METHOD_SETTINGS));
+                    } else if (which == 5) {
                         InputMethodManager manager = (InputMethodManager)
                                 getSystemService(INPUT_METHOD_SERVICE);
                         if (manager != null) {
                             manager.showInputMethodPicker();
                         }
-                    } else if (which == 4) {
+                    } else if (which == 6) {
                         showReceiveDiagnostics();
                     } else {
                         startActivity(new Intent(this, CloudActivity.class));

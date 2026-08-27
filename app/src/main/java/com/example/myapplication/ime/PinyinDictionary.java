@@ -12,8 +12,9 @@ import java.io.BufferedReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -28,23 +29,51 @@ final class PinyinDictionary {
     private static final String COMMON_HANZI_ASSET_NAME = "common_hanzi.txt";
     private static final String PREFERENCES_NAME = "pinyin_usage";
     private static final String USAGE_PREFIX = "candidate_";
+    private static final int QUERY_CACHE_SIZE = 96;
+    private static volatile PinyinDictionary cachedDictionary;
+
     private final NavigableMap<String, List<Entry>> entriesByPinyin;
     private final Set<String> syllables;
     private final SharedPreferences usagePreferences;
+    private final Map<String, Integer> usageCounts;
+    private final Map<String, List<String>> queryCache =
+            new LinkedHashMap<String, List<String>>(QUERY_CACHE_SIZE, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, List<String>> eldest) {
+                    return size() > QUERY_CACHE_SIZE;
+                }
+            };
 
-    private PinyinDictionary(
+    PinyinDictionary(
             Map<String, List<Entry>> entriesByPinyin,
             Set<String> syllables,
-            SharedPreferences usagePreferences) {
+            SharedPreferences usagePreferences,
+            Map<String, Integer> usageCounts) {
         this.entriesByPinyin = new TreeMap<>(entriesByPinyin);
         this.syllables = new HashSet<>(syllables);
         this.usagePreferences = usagePreferences;
+        this.usageCounts = new HashMap<>(usageCounts);
     }
 
     static PinyinDictionary load(Context context) {
+        PinyinDictionary cached = cachedDictionary;
+        if (cached != null) {
+            return cached;
+        }
+        synchronized (PinyinDictionary.class) {
+            if (cachedDictionary == null) {
+                cachedDictionary = loadUncached(context.getApplicationContext());
+            }
+            return cachedDictionary;
+        }
+    }
+
+    private static PinyinDictionary loadUncached(Context context) {
         Map<String, List<Entry>> index = new TreeMap<>();
         Set<String> syllableIndex = new HashSet<>();
         Set<String> commonCharacters = loadCommonCharacters(context);
+        SharedPreferences preferences =
+                context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE);
         try (InputStream input = context.getAssets().open(ASSET_NAME);
              Reader reader = new InputStreamReader(input, StandardCharsets.UTF_8);
              JsonReader json = new JsonReader(reader)) {
@@ -56,18 +85,16 @@ final class PinyinDictionary {
         } catch (Exception exception) {
             return new PinyinDictionary(
                     Collections.emptyMap(), Collections.emptySet(),
-                    context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE));
+                    preferences, loadUsageCounts(preferences));
         }
-        Comparator<Entry> order = Comparator
-                .comparingLong((Entry entry) -> entry.weight).reversed()
-                .thenComparing(entry -> entry.text);
         for (List<Entry> values : index.values()) {
-            values.sort(order);
+            Collections.sort(values, PinyinDictionary::compareStaticEntries);
         }
         return new PinyinDictionary(
                 index,
                 syllableIndex,
-                context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE));
+                preferences,
+                loadUsageCounts(preferences));
     }
 
     private static void readRecord(
@@ -153,8 +180,12 @@ final class PinyinDictionary {
         if (key == null || key.isEmpty() || text == null || text.isEmpty()) {
             return;
         }
-        index.computeIfAbsent(key, ignored -> new ArrayList<>())
-                .add(new Entry(text, frequency));
+        List<Entry> entries = index.get(key);
+        if (entries == null) {
+            entries = new ArrayList<>();
+            index.put(key, entries);
+        }
+        entries.add(new Entry(text, frequency));
     }
 
     private static int commonCharacterCount(String text, Set<String> commonCharacters) {
@@ -211,10 +242,15 @@ final class PinyinDictionary {
         return characters;
     }
 
-    List<String> query(String pinyin, int limit) {
+    synchronized List<String> query(String pinyin, int limit) {
         String normalized = normalize(pinyin);
         if (normalized.isEmpty() || limit <= 0) {
             return Collections.emptyList();
+        }
+        String cacheKey = normalized + ':' + limit;
+        List<String> cached = queryCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
         }
 
         LinkedHashSet<String> candidates = new LinkedHashSet<>();
@@ -229,43 +265,56 @@ final class PinyinDictionary {
         if (candidates.size() < limit && split.isEmpty()) {
             appendPrefixEntries(candidates, normalized, limit);
         }
-        return new ArrayList<>(candidates).subList(0, Math.min(limit, candidates.size()));
+        List<String> result = new ArrayList<>(candidates);
+        if (result.size() > limit) {
+            result = new ArrayList<>(result.subList(0, limit));
+        }
+        result = Collections.unmodifiableList(result);
+        queryCache.put(cacheKey, result);
+        return result;
     }
 
-    void recordSelection(String candidate) {
+    boolean isEmpty() {
+        return entriesByPinyin.isEmpty();
+    }
+
+    synchronized void recordSelection(String candidate) {
         if (candidate == null || candidate.isEmpty()) {
             return;
         }
         String key = USAGE_PREFIX + candidate;
-        int count = usagePreferences.getInt(key, 0);
-        usagePreferences.edit().putInt(key, Math.min(count + 1, 100_000)).apply();
+        int count = usageCounts.containsKey(candidate) ? usageCounts.get(candidate) : 0;
+        int updated = Math.min(count + 1, 100_000);
+        usageCounts.put(candidate, updated);
+        queryCache.clear();
+        if (usagePreferences != null) {
+            usagePreferences.edit().putInt(key, updated).apply();
+        }
     }
 
     private void appendPrefixEntries(Set<String> candidates, String prefix, int limit) {
-        List<Entry> prefixEntries = new ArrayList<>();
+        List<Entry> best = new ArrayList<>(limit);
         for (Map.Entry<String, List<Entry>> entry
                 : entriesByPinyin.tailMap(prefix, true).entrySet()) {
             if (!entry.getKey().startsWith(prefix)) {
                 break;
             }
-            prefixEntries.addAll(entry.getValue());
+            collectBest(best, candidates, entry.getValue(), limit, true);
         }
-        prefixEntries.sort(Comparator
-                .comparingLong(this::score).reversed()
-                .thenComparingInt(entry -> entry.text.length())
-                .thenComparing(entry -> entry.text));
-        appendEntries(candidates, prefixEntries, limit);
+        appendRankedTexts(candidates, best, limit);
     }
 
     private void appendEntries(Set<String> candidates, List<Entry> entries, int limit) {
         if (entries == null) {
             return;
         }
-        List<Entry> ordered = new ArrayList<>(entries);
-        ordered.sort(Comparator
-                .comparingLong(this::score).reversed()
-                .thenComparing(entry -> entry.text));
-        for (Entry entry : ordered) {
+        List<Entry> best = new ArrayList<>(limit);
+        collectBest(best, candidates, entries, limit, false);
+        appendRankedTexts(candidates, best, limit);
+    }
+
+    private void appendRankedTexts(Set<String> candidates, List<Entry> entries, int limit) {
+        for (Entry entry : entries) {
             candidates.add(entry.text);
             if (candidates.size() >= limit) {
                 return;
@@ -273,9 +322,82 @@ final class PinyinDictionary {
         }
     }
 
+    private void collectBest(
+            List<Entry> best,
+            Set<String> existingCandidates,
+            List<Entry> entries,
+            int limit,
+            boolean preferShorter) {
+        for (Entry entry : entries) {
+            if (!existingCandidates.contains(entry.text)) {
+                insertBest(best, entry, limit, preferShorter);
+            }
+        }
+    }
+
+    private void insertBest(List<Entry> best, Entry candidate, int limit, boolean preferShorter) {
+        for (int index = 0; index < best.size(); index++) {
+            Entry existing = best.get(index);
+            if (existing.text.equals(candidate.text)) {
+                if (compareEntries(candidate, existing, preferShorter) >= 0) {
+                    return;
+                }
+                best.remove(index);
+                break;
+            }
+        }
+        int insertion = 0;
+        while (insertion < best.size()
+                && compareEntries(candidate, best.get(insertion), preferShorter) >= 0) {
+            insertion++;
+        }
+        if (insertion < limit) {
+            best.add(insertion, candidate);
+            if (best.size() > limit) {
+                best.remove(best.size() - 1);
+            }
+        }
+    }
+
+    private int compareEntries(Entry left, Entry right, boolean preferShorter) {
+        int scoreOrder = Long.compare(score(right), score(left));
+        if (scoreOrder != 0) {
+            return scoreOrder;
+        }
+        if (preferShorter) {
+            int lengthOrder = Integer.compare(left.text.length(), right.text.length());
+            if (lengthOrder != 0) {
+                return lengthOrder;
+            }
+        }
+        return left.text.compareTo(right.text);
+    }
+
+    private static int compareStaticEntries(Entry left, Entry right) {
+        int weightOrder = Long.compare(right.weight, left.weight);
+        return weightOrder != 0 ? weightOrder : left.text.compareTo(right.text);
+    }
+
     private long score(Entry entry) {
         return entry.weight
-                + (long) usagePreferences.getInt(USAGE_PREFIX + entry.text, 0) * 10_000_000L;
+                + (long) usageCount(entry.text) * 10_000_000L;
+    }
+
+    private int usageCount(String candidate) {
+        Integer count = usageCounts.get(candidate);
+        return count == null ? 0 : count;
+    }
+
+    private static Map<String, Integer> loadUsageCounts(SharedPreferences preferences) {
+        Map<String, Integer> counts = new HashMap<>();
+        for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
+            if (entry.getKey().startsWith(USAGE_PREFIX) && entry.getValue() instanceof Integer) {
+                counts.put(
+                        entry.getKey().substring(USAGE_PREFIX.length()),
+                        (Integer) entry.getValue());
+            }
+        }
+        return counts;
     }
 
     private String composeSingleCharacters(List<String> split) {
@@ -352,11 +474,11 @@ final class PinyinDictionary {
         return result.toString();
     }
 
-    private static final class Entry {
+    static final class Entry {
         private final String text;
         private final long weight;
 
-        private Entry(String text, long weight) {
+        Entry(String text, long weight) {
             this.text = text;
             this.weight = weight;
         }
