@@ -75,7 +75,7 @@ app/build/outputs/apk/debug/app-debug.apk
 
 ## 27 键中文输入
 
-输入法顶部可在“文字”和“表情”两种模式间切换。文字模式提供 QWERTY 三行共 27 个主键，按键先组成拼音并在候选栏显示中文词语；点击候选或空格提交，退格优先删除拼音，回车发送换行，“中英”切换英文直输。内置完整大词库文件 `app/src/main/assets/lexicon_chat.json`，来源为 [Gong-Yie/lexicon](https://github.com/Gong-Yie/lexicon) 的 `大词库.json`；解析采用流式读取，避免一次性加载原始 JSON。使用或再分发前请核对上游数据许可。
+输入法顶部可在“文字”和“表情”两种模式间切换。文字模式提供 QWERTY 三行共 27 个主键，按键先组成拼音并在候选栏显示中文词语；点击候选或空格提交，退格优先删除拼音，回车发送换行，“中英”切换英文直输。连续拼音会按音节切分，完整词组优先；没有词组命中时，会由单字索引组合兜底候选。候选提交后会记录本机使用次数，下一次相同拼音查询时优先显示用户常用候选。内置完整大词库文件 `app/src/main/assets/lexicon_chat.json`，并使用 `common_hanzi.txt` 优先常用单字，来源为 [Gong-Yie/lexicon](https://github.com/Gong-Yie/lexicon) 的 `大词库.json` 和 `EncodeTable/CommonHanzi.txt`；解析采用流式读取，避免一次性加载原始 JSON。使用或再分发前请核对上游数据许可。
 
 ## EmojiKing 云端
 
