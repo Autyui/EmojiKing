@@ -92,3 +92,8 @@ app/build/outputs/apk/debug/app-debug.apk
 - `DELETE /api/delete`：接收 `machine_code` 和云端返回的 `path`，仅删除当前设备的云端图片。
 
 同步时会先下载到应用缓存，再按真实图片内容导入本地表情包；本地目录仍是主界面和输入法的唯一读取来源。云端页面只展示当前机器码对应的远端记录，支持多选后顺序删除；删除不影响本地图片。当前云端地址和设备 ID 保存在应用本地，服务端 GitHub 凭据只应配置在服务端。
+
+### 云端来源
+
+- 云端网站：[EmojiKing-Imagehosting](https://github.com/Gong-Yie/EmojiKing-Imagehosting)
+- 图床：[Imagehosting](https://github.com/gggongyizhen/Imagehosting)

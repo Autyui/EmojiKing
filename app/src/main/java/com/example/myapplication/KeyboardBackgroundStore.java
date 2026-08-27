@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /** Owns the private, size-bounded image used behind the text keyboard. */
+// 类作用：定义 KeyboardBackgroundStore，承载所在模块的主要职责。
 public final class KeyboardBackgroundStore {
     private static final long MAX_SOURCE_BYTES = 20L * 1024L * 1024L;
     private static final long MAX_SOURCE_PIXELS = 40_000_000L;
@@ -19,9 +20,11 @@ public final class KeyboardBackgroundStore {
     private static final String DIRECTORY = "keyboard-theme";
     private static final String FILE_NAME = "background.jpg";
 
+// 方法作用：初始化 KeyboardBackgroundStore 对象并建立其运行所需状态。
     private KeyboardBackgroundStore() {
     }
 
+// 方法作用：校验并持久化用户提供的数据（save）。
     public static synchronized void save(Context context, Uri source) throws IOException {
         if (source == null) {
             throw new IOException("No keyboard background was selected");
@@ -44,6 +47,7 @@ public final class KeyboardBackgroundStore {
         }
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（clear）。
     public static synchronized boolean clear(Context context) throws IOException {
         File directory = directory(context);
         File target = new File(directory, FILE_NAME);
@@ -60,15 +64,18 @@ public final class KeyboardBackgroundStore {
         return true;
     }
 
+// 方法作用：判断当前对象是否满足指定条件（hasBackground）。
     public static boolean hasBackground(Context context) {
         return backgroundFile(context).isFile();
     }
 
+// 方法作用：处理 version 对应的输入并返回或更新相关结果（version）。
     public static long version(Context context) {
         File file = backgroundFile(context);
         return file.isFile() ? file.lastModified() * 31L + file.length() : 0L;
     }
 
+// 方法作用：从文件、网络或内存加载数据（load）。
     public static Bitmap load(Context context) {
         File file = backgroundFile(context);
         if (!file.isFile()) {
@@ -79,6 +86,7 @@ public final class KeyboardBackgroundStore {
         return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
     }
 
+// 方法作用：根据输入参数计算或比较结果（calculateSampleSize）。
     static int calculateSampleSize(int width, int height, int maximumDimension) {
         int sample = 1;
         int largest = Math.max(width, height);
@@ -88,6 +96,7 @@ public final class KeyboardBackgroundStore {
         return sample;
     }
 
+// 方法作用：在受控范围内复制输入数据（copySource）。
     private static void copySource(ContentResolver resolver, Uri source, File destination)
             throws IOException {
         long total = 0L;
@@ -113,9 +122,11 @@ public final class KeyboardBackgroundStore {
         }
     }
 
+// 方法作用：解码输入内容并生成可用对象（decodePrepared）。
     private static Bitmap decodePrepared(File source) throws IOException {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
+        // 先读取尺寸而不分配像素内存，提前拒绝超大图片以控制内存峰值。
         BitmapFactory.decodeFile(source.getAbsolutePath(), bounds);
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
             throw new IOException("The selected file is not a readable image");
@@ -150,6 +161,7 @@ public final class KeyboardBackgroundStore {
         return scaled;
     }
 
+// 方法作用：将对象转换后写入目标存储（writePending）。
     private static void writePending(Bitmap bitmap, File pending) throws IOException {
         deleteIfPresent(pending, "pending keyboard background");
         try (FileOutputStream output = new FileOutputStream(pending)) {
@@ -164,6 +176,7 @@ public final class KeyboardBackgroundStore {
         }
     }
 
+// 方法作用：处理 activate 对应的输入并返回或更新相关结果（activate）。
     private static void activate(File directory, File pending) throws IOException {
         File target = new File(directory, FILE_NAME);
         File backup = new File(directory, FILE_NAME + ".bak");
@@ -181,10 +194,12 @@ public final class KeyboardBackgroundStore {
         backup.delete();
     }
 
+// 方法作用：处理 backgroundFile 对应的输入并返回或更新相关结果（backgroundFile）。
     private static File backgroundFile(Context context) {
         return new File(directory(context), FILE_NAME);
     }
 
+// 方法作用：处理 directory 对应的输入并返回或更新相关结果（directory）。
     private static File directory(Context context) {
         File directory = new File(context.getApplicationContext().getFilesDir(), DIRECTORY);
         if (!directory.exists() && !directory.mkdirs()) {
@@ -193,6 +208,7 @@ public final class KeyboardBackgroundStore {
         return directory;
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteIfPresent）。
     private static void deleteIfPresent(File file, String description) throws IOException {
         if (file.exists() && !file.delete()) {
             throw new IOException("Cannot remove " + description);

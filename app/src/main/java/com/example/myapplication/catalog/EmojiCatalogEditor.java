@@ -4,16 +4,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Rebuilds immutable catalog snapshots for gallery references, packs and items. */
+// 类作用：定义 EmojiCatalogEditor，承载所在模块的主要职责。
 final class EmojiCatalogEditor {
+// 方法作用：初始化 EmojiCatalogEditor 对象并建立其运行所需状态。
     private EmojiCatalogEditor() {
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addGallery）。
     static EmojiCatalog addGallery(EmojiCatalog catalog, EmojiCatalog.Gallery gallery) {
         List<EmojiCatalog.Gallery> galleries = new ArrayList<>(catalog.getGalleries());
         galleries.add(gallery);
         return rebuild(catalog, galleries, catalog.getPacks());
     }
 
+// 方法作用：修改目标图库或表情包的名称并保存变更（renameGallery）。
     static EmojiCatalog renameGallery(EmojiCatalog catalog, String galleryId, String name) {
         List<EmojiCatalog.Gallery> galleries = new ArrayList<>();
         boolean changed = false;
@@ -30,6 +34,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, galleries, catalog.getPacks());
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（removeGallery）。
     static EmojiCatalog removeGallery(EmojiCatalog catalog, String galleryId) {
         List<EmojiCatalog.Gallery> galleries = new ArrayList<>();
         boolean changed = false;
@@ -44,6 +49,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, galleries, catalog.getPacks());
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addPack）。
     static EmojiCatalog addPack(
             EmojiCatalog catalog,
             EmojiCatalog.Pack newPack,
@@ -54,6 +60,7 @@ final class EmojiCatalogEditor {
         return linkPack(withPack, newPack.getId(), galleryIds);
     }
 
+// 方法作用：建立图库与表情包之间的关联并校验引用（linkPack）。
     static EmojiCatalog linkPack(
             EmojiCatalog catalog,
             String packId,
@@ -81,6 +88,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, galleries, catalog.getPacks());
     }
 
+// 方法作用：解除图库与表情包之间的关联并保存变更（unlinkPack）。
     static EmojiCatalog unlinkPack(
             EmojiCatalog catalog,
             String galleryId,
@@ -100,6 +108,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, galleries, catalog.getPacks());
     }
 
+// 方法作用：修改目标图库或表情包的名称并保存变更（renamePack）。
     static EmojiCatalog renamePack(EmojiCatalog catalog, String packId, String name) {
         List<EmojiCatalog.Pack> packs = new ArrayList<>();
         boolean changed = false;
@@ -116,6 +125,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, catalog.getGalleries(), packs);
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（removePack）。
     static EmojiCatalog removePack(EmojiCatalog catalog, String packId) {
         List<EmojiCatalog.Pack> packs = new ArrayList<>();
         boolean changed = false;
@@ -136,6 +146,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, galleries, packs);
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addItem）。
     static EmojiCatalog addItem(
             EmojiCatalog catalog,
             String packId,
@@ -156,6 +167,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, catalog.getGalleries(), packs);
     }
 
+// 方法作用：替换已有图片或目录记录并保持索引一致（replaceItem）。
     static EmojiCatalog replaceItem(
             EmojiCatalog catalog,
             String itemId,
@@ -178,6 +190,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, catalog.getGalleries(), packs);
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（removeItem）。
     static EmojiCatalog removeItem(EmojiCatalog catalog, String itemId) {
         List<EmojiCatalog.Pack> packs = new ArrayList<>();
         boolean changed = false;
@@ -196,6 +209,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, catalog.getGalleries(), packs);
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（removeItems）。
     static EmojiCatalog removeItems(
             EmojiCatalog catalog,
             String packId,
@@ -218,6 +232,7 @@ final class EmojiCatalogEditor {
         return rebuild(catalog, catalog.getGalleries(), packs);
     }
 
+// 方法作用：处理 rebuild 对应的输入并返回或更新相关结果（rebuild）。
     private static EmojiCatalog rebuild(
             EmojiCatalog catalog,
             List<EmojiCatalog.Gallery> galleries,
@@ -225,12 +240,14 @@ final class EmojiCatalogEditor {
         return new EmojiCatalog(catalog.getVersion(), galleries, packs);
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requireChanged）。
     private static void requireChanged(boolean changed, String error) {
         if (!changed) {
             throw new IllegalArgumentException(error);
         }
     }
 
+// 方法作用：在受控范围内复制输入数据（copyGallery）。
     private static EmojiCatalog.Gallery copyGallery(
             EmojiCatalog.Gallery gallery,
             List<String> packIds) {
@@ -238,6 +255,7 @@ final class EmojiCatalogEditor {
                 gallery.getId(), gallery.getName(), gallery.getSortOrder(), packIds);
     }
 
+// 方法作用：在受控范围内复制输入数据（copyPack）。
     private static EmojiCatalog.Pack copyPack(
             EmojiCatalog.Pack pack,
             List<EmojiCatalog.Item> items) {

@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Structured JSON adapter with an in-memory migration from the nested v1 format. */
+// 类作用：定义 EmojiCatalogJsonCodec，承载所在模块的主要职责。
 final class EmojiCatalogJsonCodec {
     private final Gson gson = new GsonBuilder()
             .disableHtmlEscaping()
@@ -62,6 +63,7 @@ final class EmojiCatalogJsonCodec {
         return gson.toJson(root) + "\n";
     }
 
+// 方法作用：解码输入内容并生成可用对象（decodeVersionTwo）。
     private EmojiCatalog decodeVersionTwo(JsonObject root) throws IOException {
         JsonArray galleriesJson = requireArray(root, "galleries");
         List<EmojiCatalog.Gallery> galleries = new ArrayList<>();
@@ -93,6 +95,7 @@ final class EmojiCatalogJsonCodec {
         return new EmojiCatalog(EmojiCatalog.CURRENT_VERSION, galleries, packs);
     }
 
+// 方法作用：解码输入内容并生成可用对象（decodeVersionOne）。
     private EmojiCatalog decodeVersionOne(JsonObject root) throws IOException {
         JsonArray galleriesJson = requireArray(root, "galleries");
         List<EmojiCatalog.Gallery> galleries = new ArrayList<>();
@@ -118,6 +121,7 @@ final class EmojiCatalogJsonCodec {
         return new EmojiCatalog(EmojiCatalog.CURRENT_VERSION, galleries, packs);
     }
 
+// 方法作用：将对象转换后写入目标存储（encodePack）。
     private JsonObject encodePack(EmojiCatalog.Pack pack) {
         JsonObject packJson = new JsonObject();
         packJson.addProperty("id", pack.getId());
@@ -138,6 +142,7 @@ final class EmojiCatalogJsonCodec {
         return packJson;
     }
 
+// 方法作用：解码输入内容并生成可用对象（decodePack）。
     private EmojiCatalog.Pack decodePack(JsonObject json) throws IOException {
         JsonArray itemsJson = requireArray(json, "items");
         List<EmojiCatalog.Item> items = new ArrayList<>();
@@ -151,6 +156,7 @@ final class EmojiCatalogJsonCodec {
                 items);
     }
 
+// 方法作用：解码输入内容并生成可用对象（decodeItem）。
     private EmojiCatalog.Item decodeItem(JsonObject json) throws IOException {
         return new EmojiCatalog.Item(
                 requireString(json, "id"),
@@ -161,6 +167,7 @@ final class EmojiCatalogJsonCodec {
                 requireInt(json, "sortOrder"));
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requireObject）。
     private static JsonObject requireObject(JsonElement element, String name) throws IOException {
         if (element == null || !element.isJsonObject()) {
             throw new IOException(name + " must be an object");
@@ -168,6 +175,7 @@ final class EmojiCatalogJsonCodec {
         return element.getAsJsonObject();
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requireArray）。
     private static JsonArray requireArray(JsonObject object, String name) throws IOException {
         JsonElement element = object.get(name);
         if (element == null || !element.isJsonArray()) {
@@ -176,6 +184,7 @@ final class EmojiCatalogJsonCodec {
         return element.getAsJsonArray();
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requireString）。
     private static String requireString(JsonObject object, String name) throws IOException {
         JsonElement element = object.get(name);
         if (element == null || !element.isJsonPrimitive()
@@ -185,6 +194,7 @@ final class EmojiCatalogJsonCodec {
         return element.getAsString();
     }
 
+// 方法作用：读取 JSON 中可选的字符串字段并处理缺省值（optionalString）。
     private static String optionalString(JsonObject object, String name) throws IOException {
         JsonElement element = object.get(name);
         if (element == null || element.isJsonNull()) {
@@ -196,6 +206,7 @@ final class EmojiCatalogJsonCodec {
         return element.getAsString();
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requireInt）。
     private static int requireInt(JsonObject object, String name) throws IOException {
         JsonElement element = object.get(name);
         if (element == null || !element.isJsonPrimitive()) {

@@ -25,7 +25,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/** Bridges Android document URIs to the application-private emoji catalog. */
+/** 把 Android 文档 URI 转换为应用私有表情目录中的文件。 */
+// 类作用：定义 EmojiFileStore，承载所在模块的主要职责。
 public final class EmojiFileStore {
     public static final long MAX_IMAGE_BYTES = 20L * 1024L * 1024L;
     public static final long MAX_IMAGE_PIXELS = 40_000_000L;
@@ -36,13 +37,16 @@ public final class EmojiFileStore {
     private static LocalEmojiCatalogRepository sharedRepository;
     private static String sharedRepositoryRoot;
 
+// 方法作用：初始化 EmojiFileStore 对象并建立其运行所需状态。
     private EmojiFileStore() {
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getCurrentFile）。
     public static synchronized File getCurrentFile(Context context) {
         return getCurrentEmoji(context).getFile();
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getCurrentEmoji）。
     public static synchronized LocalEmojiCatalogRepository.StoredEmoji getCurrentEmoji(
             Context context) {
         File legacyFile = getLegacyCurrentFile(context);
@@ -55,11 +59,13 @@ public final class EmojiFileStore {
         }
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getCatalog）。
     public static synchronized EmojiCatalog getCatalog(Context context) throws IOException {
         ensureCatalog(context);
         return repository(context).loadCatalog();
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getStoredEmoji）。
     public static synchronized LocalEmojiCatalogRepository.StoredEmoji getStoredEmoji(
             Context context,
             String itemId) throws IOException {
@@ -67,10 +73,12 @@ public final class EmojiFileStore {
         return repository(context).getStoredEmoji(itemId);
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getManagedFile）。
     public static File getManagedFile(Context context, EmojiCatalog.Item item) throws IOException {
         return repository(context).resolveImageFile(item);
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getLegacyCurrentFile）。
     private static File getLegacyCurrentFile(Context context) {
         File directory = getDirectory(context);
         File[] files = directory.listFiles((dir, name) -> name.startsWith(FILE_PREFIX));
@@ -80,16 +88,19 @@ public final class EmojiFileStore {
         return createSample(directory);
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getCurrentUri）。
     public static synchronized Uri getCurrentUri(Context context) {
         return getUri(context, getCurrentEmoji(context));
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getCurrentUri）。
     public static Uri getCurrentUri(
             Context context,
             LocalEmojiCatalogRepository.StoredEmoji emoji) {
         return getUri(context, emoji);
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getUri）。
     public static Uri getUri(
             Context context,
             LocalEmojiCatalogRepository.StoredEmoji emoji) {
@@ -99,6 +110,7 @@ public final class EmojiFileStore {
                 emoji.getFile());
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getUri）。
     public static Uri getUri(Context context, EmojiCatalog.Item item) throws IOException {
         return androidx.core.content.FileProvider.getUriForFile(
                 context,
@@ -106,7 +118,8 @@ public final class EmojiFileStore {
                 getManagedFile(context, item));
     }
 
-    /** Compatibility entry point retained for the existing single-image flow. */
+    /** 保留单图导入入口，兼容既有调用流程。 */
+// 方法作用：校验并导入外部数据（importImage）。
     public static synchronized File importImage(Context context, Uri source) throws IOException {
         List<Uri> sources = new ArrayList<>();
         sources.add(source);
@@ -123,6 +136,7 @@ public final class EmojiFileStore {
         return result.getLastImported().getFile();
     }
 
+// 方法作用：校验并导入外部数据（importImages）。
     public static synchronized BatchImportResult importImages(
             Context context,
             List<Uri> sources,
@@ -136,6 +150,7 @@ public final class EmojiFileStore {
         int duplicate = 0;
         LocalEmojiCatalogRepository.StoredEmoji lastImported = null;
         List<ImportFailure> failures = new ArrayList<>();
+        // 每张图片独立处理；单张失败只记录原因，不回滚已经成功导入的图片。
         for (Uri source : sources) {
             String displayName = queryDisplayName(context.getContentResolver(), source);
             try {
@@ -162,6 +177,7 @@ public final class EmojiFileStore {
         return new BatchImportResult(imported, duplicate, failures, lastImported);
     }
 
+// 方法作用：校验并导入外部数据（importFile）。
     public static synchronized LocalEmojiCatalogRepository.ImportResult importFile(
             Context context,
             File source,
@@ -182,6 +198,7 @@ public final class EmojiFileStore {
                 info.mimeType);
     }
 
+// 方法作用：处理 listImageDocuments 对应的输入并返回或更新相关结果（listImageDocuments）。
     public static List<Uri> listImageDocuments(Context context, Uri treeUri) throws IOException {
         if (treeUri == null) {
             throw new IOException("The selected directory authorization is invalid");
@@ -198,6 +215,7 @@ public final class EmojiFileStore {
         return result;
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createPack）。
     public static synchronized EmojiCatalog.Pack createPack(Context context, String name)
             throws IOException {
         ensureCatalog(context);
@@ -206,6 +224,7 @@ public final class EmojiFileStore {
                 name);
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createPacks）。
     public static synchronized List<EmojiCatalog.Pack> createPacks(
             Context context,
             List<String> galleryIds,
@@ -214,6 +233,7 @@ public final class EmojiFileStore {
         return repository(context).createPacks(galleryIds, names);
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createGallery）。
     public static synchronized EmojiCatalog.Gallery createGallery(
             Context context,
             String name) throws IOException {
@@ -221,6 +241,7 @@ public final class EmojiFileStore {
         return repository(context).createGallery(name);
     }
 
+// 方法作用：修改目标图库或表情包的名称并保存变更（renameGallery）。
     public static synchronized void renameGallery(
             Context context,
             String galleryId,
@@ -228,11 +249,13 @@ public final class EmojiFileStore {
         repository(context).renameGallery(galleryId, name);
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteGallery）。
     public static synchronized void deleteGallery(Context context, String galleryId)
             throws IOException {
         repository(context).deleteGallery(galleryId);
     }
 
+// 方法作用：建立图库与表情包之间的关联并校验引用（linkPacksToGallery）。
     public static synchronized void linkPacksToGallery(
             Context context,
             String galleryId,
@@ -240,6 +263,7 @@ public final class EmojiFileStore {
         repository(context).linkPacksToGallery(galleryId, packIds);
     }
 
+// 方法作用：解除图库与表情包之间的关联并保存变更（unlinkPackFromGallery）。
     public static synchronized void unlinkPackFromGallery(
             Context context,
             String galleryId,
@@ -247,6 +271,7 @@ public final class EmojiFileStore {
         repository(context).unlinkPackFromGallery(galleryId, packId);
     }
 
+// 方法作用：解除图库与表情包之间的关联并保存变更（unlinkPacksFromGallery）。
     public static synchronized void unlinkPacksFromGallery(
             Context context,
             String galleryId,
@@ -254,15 +279,18 @@ public final class EmojiFileStore {
         repository(context).unlinkPacksFromGallery(galleryId, packIds);
     }
 
+// 方法作用：修改目标图库或表情包的名称并保存变更（renamePack）。
     public static synchronized void renamePack(Context context, String packId, String name)
             throws IOException {
         repository(context).renamePack(packId, name);
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deletePack）。
     public static synchronized void deletePack(Context context, String packId) throws IOException {
         repository(context).deletePack(packId);
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（updateItemNote）。
     public static synchronized void updateItemNote(
             Context context,
             String itemId,
@@ -270,10 +298,12 @@ public final class EmojiFileStore {
         repository(context).updateItemNote(itemId, note);
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteItem）。
     public static synchronized void deleteItem(Context context, String itemId) throws IOException {
         repository(context).deleteItem(itemId);
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteItems）。
     public static synchronized void deleteItems(
             Context context,
             String packId,
@@ -281,6 +311,7 @@ public final class EmojiFileStore {
         repository(context).deleteItems(packId, itemIds);
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getMimeType）。
     public static String getMimeType(File file) {
         String name = file.getName().toLowerCase(Locale.US);
         if (name.endsWith(".jpg") || name.endsWith(".jpeg")) {
@@ -295,10 +326,12 @@ public final class EmojiFileStore {
         return "image/png";
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（ensureCatalog）。
     private static void ensureCatalog(Context context) {
         getCurrentEmoji(context);
     }
 
+// 方法作用：复制、校验并准备待导入的图片文件（prepareImage）。
     private static PreparedImage prepareImage(
             Context context,
             Uri source,
@@ -328,6 +361,7 @@ public final class EmojiFileStore {
         }
     }
 
+// 方法作用：在受控范围内复制输入数据（copyDocument）。
     private static void copyDocument(ContentResolver resolver, Uri source, File destination)
             throws IOException {
         long total = 0;
@@ -353,6 +387,7 @@ public final class EmojiFileStore {
         }
     }
 
+// 方法作用：读取图片尺寸和 MIME 类型等元数据（inspectImage）。
     private static ImageInfo inspectImage(File file) throws IOException {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
@@ -368,6 +403,7 @@ public final class EmojiFileStore {
         return new ImageInfo(bounds.outWidth, bounds.outHeight, mimeType);
     }
 
+// 方法作用：清理并规范化输入值（normalizeDecodedMime）。
     private static String normalizeDecodedMime(String mimeType) {
         if (mimeType == null) {
             return null;
@@ -388,6 +424,7 @@ public final class EmojiFileStore {
         return null;
     }
 
+// 方法作用：清理并规范化输入值（normalizeDisplayName）。
     private static String normalizeDisplayName(String displayName, String mimeType) {
         String normalized = displayName == null ? "" : displayName.trim();
         normalized = normalized.replace('\\', '/');
@@ -401,6 +438,7 @@ public final class EmojiFileStore {
         return normalized.length() > 160 ? normalized.substring(0, 160) : normalized;
     }
 
+// 方法作用：处理 extensionForMime 对应的输入并返回或更新相关结果（extensionForMime）。
     private static String extensionForMime(String mimeType) {
         if ("image/jpeg".equals(mimeType)) {
             return "jpg";
@@ -414,6 +452,7 @@ public final class EmojiFileStore {
         return "png";
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（queryDisplayName）。
     private static String queryDisplayName(ContentResolver resolver, Uri source) {
         if (source == null) {
             return "未知文件";
@@ -439,6 +478,7 @@ public final class EmojiFileStore {
         return "未知文件";
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（querySize）。
     private static long querySize(ContentResolver resolver, Uri source) {
         if (source == null) {
             return -1;
@@ -461,6 +501,7 @@ public final class EmojiFileStore {
         return -1;
     }
 
+// 方法作用：递归遍历授权目录并收集图片 URI（collectImageDocuments）。
     private static void collectImageDocuments(
             ContentResolver resolver,
             Uri treeUri,
@@ -505,6 +546,7 @@ public final class EmojiFileStore {
         }
     }
 
+// 方法作用：从输入源读取并转换数据（readableReason）。
     private static String readableReason(Exception exception) {
         String message = exception.getMessage();
         return message == null || message.trim().isEmpty()
@@ -512,6 +554,7 @@ public final class EmojiFileStore {
                 : message.trim();
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getDirectory）。
     private static File getDirectory(Context context) {
         File directory = new File(context.getFilesDir(), DIRECTORY);
         if (!directory.exists() && !directory.mkdirs()) {
@@ -520,6 +563,7 @@ public final class EmojiFileStore {
         return directory;
     }
 
+// 方法作用：按应用文件目录取得可复用的目录仓库实例（repository）。
     private static synchronized LocalEmojiCatalogRepository repository(Context context) {
         String root = context.getApplicationContext().getFilesDir().getAbsolutePath();
         if (sharedRepository == null || !root.equals(sharedRepositoryRoot)) {
@@ -529,6 +573,7 @@ public final class EmojiFileStore {
         return sharedRepository;
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createSample）。
     private static File createSample(File directory) {
         File destination = new File(directory, FILE_PREFIX + "png");
         Bitmap bitmap = Bitmap.createBitmap(320, 320, Bitmap.Config.ARGB_8888);
@@ -556,11 +601,13 @@ public final class EmojiFileStore {
         return destination;
     }
 
+// 类作用：定义 PreparedImage，承载所在模块的主要职责。
     private static final class PreparedImage {
         private final File file;
         private final String displayName;
         private final String mimeType;
 
+// 方法作用：初始化 PreparedImage 对象并建立其运行所需状态。
         private PreparedImage(File file, String displayName, String mimeType) {
             this.file = file;
             this.displayName = displayName;
@@ -568,11 +615,13 @@ public final class EmojiFileStore {
         }
     }
 
+// 类作用：定义 ImageInfo，承载所在模块的主要职责。
     private static final class ImageInfo {
         private final int width;
         private final int height;
         private final String mimeType;
 
+// 方法作用：初始化 ImageInfo 对象并建立其运行所需状态。
         private ImageInfo(int width, int height, String mimeType) {
             this.width = width;
             this.height = height;
@@ -580,30 +629,36 @@ public final class EmojiFileStore {
         }
     }
 
+// 类作用：定义 ImportFailure，承载所在模块的主要职责。
     public static final class ImportFailure {
         private final String displayName;
         private final String reason;
 
+// 方法作用：初始化 ImportFailure 对象并建立其运行所需状态。
         private ImportFailure(String displayName, String reason) {
             this.displayName = displayName;
             this.reason = reason;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getDisplayName）。
         public String getDisplayName() {
             return displayName;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getReason）。
         public String getReason() {
             return reason;
         }
     }
 
+// 类作用：定义 BatchImportResult，承载所在模块的主要职责。
     public static final class BatchImportResult {
         private final int importedCount;
         private final int duplicateCount;
         private final List<ImportFailure> failures;
         private final LocalEmojiCatalogRepository.StoredEmoji lastImported;
 
+// 方法作用：初始化 BatchImportResult 对象并建立其运行所需状态。
         private BatchImportResult(
                 int importedCount,
                 int duplicateCount,
@@ -615,18 +670,22 @@ public final class EmojiFileStore {
             this.lastImported = lastImported;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getImportedCount）。
         public int getImportedCount() {
             return importedCount;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getDuplicateCount）。
         public int getDuplicateCount() {
             return duplicateCount;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getFailures）。
         public List<ImportFailure> getFailures() {
             return new ArrayList<>(failures);
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getLastImported）。
         public LocalEmojiCatalogRepository.StoredEmoji getLastImported() {
             return lastImported;
         }

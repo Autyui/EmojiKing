@@ -27,7 +27,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Dedicated cloud management page for the current machine code. */
+/** 云端管理页面，负责维护当前机器码对应的远程图片。 */
+// 类作用：定义 CloudActivity，承载所在模块的主要职责。
 public final class CloudActivity extends AppCompatActivity {
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final List<CheckBox> imageChecks = new ArrayList<>();
@@ -40,6 +41,7 @@ public final class CloudActivity extends AppCompatActivity {
     private TextView statusView;
     private Button deleteButton;
 
+// 方法作用：按生命周期创建并初始化界面或服务状态（onCreate）。
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -48,12 +50,14 @@ public final class CloudActivity extends AppCompatActivity {
         loadRemoteImages();
     }
 
+// 方法作用：按生命周期释放线程、监听器和其他资源（onDestroy）。
     @Override
     protected void onDestroy() {
         executor.shutdownNow();
         super.onDestroy();
     }
 
+// 方法作用：构建并更新用户界面内容（buildLayout）。
     private View buildLayout() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -109,6 +113,7 @@ public final class CloudActivity extends AppCompatActivity {
         return root;
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（updateHeader）。
     private void updateHeader() {
         machineCodeView.setText("机器码：" + ImageHostingClient.getMachineCode(this));
         addressView.setText("云端地址：" + ImageHostingClient.getConfiguredBaseUrl(this));
@@ -125,6 +130,7 @@ public final class CloudActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：从文件、网络或内存加载数据（loadRemoteImages）。
     private void loadRemoteImages() {
         if (ImageHostingClient.getConfiguredBaseUrl(this).trim().isEmpty()) {
             setBusy(false, "请先配置云端地址");
@@ -148,6 +154,7 @@ public final class CloudActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：构建并更新用户界面内容（renderImages）。
     private void renderImages() {
         imageList.removeAllViews();
         imageChecks.clear();
@@ -166,6 +173,7 @@ public final class CloudActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：处理 uploadCurrentPack 对应的输入并返回或更新相关结果（uploadCurrentPack）。
     private void uploadCurrentPack() {
         EmojiSelectionStore.Selection selection = currentSelection();
         EmojiCatalog.Pack pack = selection == null ? null : selection.getPack();
@@ -205,6 +213,7 @@ public final class CloudActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：处理 syncToCurrentPack 对应的输入并返回或更新相关结果（syncToCurrentPack）。
     private void syncToCurrentPack() {
         EmojiSelectionStore.Selection selection = currentSelection();
         EmojiCatalog.Pack pack = selection == null ? null : selection.getPack();
@@ -254,6 +263,7 @@ public final class CloudActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：处理 confirmDeleteSelected 对应的输入并返回或更新相关结果（confirmDeleteSelected）。
     private void confirmDeleteSelected() {
         List<ImageHostingClient.RemoteImage> selected = selectedImages();
         if (selected.isEmpty()) {
@@ -269,6 +279,7 @@ public final class CloudActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteSelected）。
     private void deleteSelected(List<ImageHostingClient.RemoteImage> selected) {
         setBusy(true, "正在批量删除云端图片…");
         executor.execute(() -> {
@@ -298,6 +309,7 @@ public final class CloudActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：显示或打开对应的交互界面（showAddressDialog）。
     private void showAddressDialog() {
         final android.widget.EditText input = new android.widget.EditText(this);
         input.setSingleLine(true);
@@ -324,6 +336,7 @@ public final class CloudActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：处理 currentSelection 对应的输入并返回或更新相关结果（currentSelection）。
     @Nullable
     private EmojiSelectionStore.Selection currentSelection() {
         try {
@@ -333,6 +346,7 @@ public final class CloudActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedImages）。
     private List<ImageHostingClient.RemoteImage> selectedImages() {
         List<ImageHostingClient.RemoteImage> selected = new ArrayList<>();
         for (int index = 0; index < imageChecks.size(); index++) {
@@ -343,6 +357,7 @@ public final class CloudActivity extends AppCompatActivity {
         return selected;
     }
 
+// 方法作用：更新对象状态或注册回调（setBusy）。
     private void setBusy(boolean value, String message) {
         deleteButton.setEnabled(!value);
         imageList.setEnabled(!value);
@@ -354,10 +369,12 @@ public final class CloudActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：更新对象状态或注册回调（setFailure）。
     private void setFailure(Exception exception) {
         setBusy(false, "云端操作失败：" + readableMessage(exception));
     }
 
+// 方法作用：创建统一样式的按钮并绑定点击监听器（button）。
     private Button button(String text, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(text);
@@ -369,6 +386,7 @@ public final class CloudActivity extends AppCompatActivity {
         return button;
     }
 
+// 方法作用：创建统一样式的文本标签（label）。
     private TextView label(String text, int size) {
         TextView label = new TextView(this);
         label.setText(text);
@@ -378,42 +396,51 @@ public final class CloudActivity extends AppCompatActivity {
         return label;
     }
 
+// 方法作用：创建匹配父容器尺寸的布局参数（matchWrap）。
     private LinearLayout.LayoutParams matchWrap() {
         return new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
+// 方法作用：处理 surfaceColor 对应的输入并返回或更新相关结果（surfaceColor）。
     private int surfaceColor() {
         return isNightMode() ? 0xff121212 : 0xfffafafa;
     }
 
+// 方法作用：处理 primaryTextColor 对应的输入并返回或更新相关结果（primaryTextColor）。
     private int primaryTextColor() {
         return isNightMode() ? 0xfff2f2f2 : 0xff202124;
     }
 
+// 方法作用：处理 secondaryTextColor 对应的输入并返回或更新相关结果（secondaryTextColor）。
     private int secondaryTextColor() {
         return isNightMode() ? 0xffb7b7b7 : 0xff686b70;
     }
 
+// 方法作用：判断当前对象是否满足指定条件（isNightMode）。
     private boolean isNightMode() {
         int mask = getResources().getConfiguration().uiMode
                 & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
         return mask == android.content.res.Configuration.UI_MODE_NIGHT_YES;
     }
 
+// 方法作用：处理 dp 对应的输入并返回或更新相关结果（dp）。
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
+// 方法作用：在相关数据表示之间进行转换（toast）。
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
+// 方法作用：从输入源读取并转换数据（readableMessage）。
     private static String readableMessage(Exception exception) {
         String message = exception.getMessage();
         return message == null || message.trim().isEmpty() ? "未知错误" : message.trim();
     }
 
+// 方法作用：将输入值格式化为用户可读文本（formatBytes）。
     private static String formatBytes(long bytes) {
         if (bytes < 1024L) {
             return bytes + " B";

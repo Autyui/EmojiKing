@@ -45,6 +45,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Chinese text keyboard and local emoji browser sharing one fixed input surface. */
+// 类作用：定义 EmojiInputMethodService，承载所在模块的主要职责。
 public class EmojiInputMethodService extends InputMethodService {
     private static final int CANDIDATE_LIMIT = 15;
     private static final int EXPANDED_CANDIDATE_COLUMNS = 3;
@@ -95,6 +96,7 @@ public class EmojiInputMethodService extends InputMethodService {
     private boolean chooseFirstPending;
     private boolean candidateExpanded;
 
+// 方法作用：按生命周期创建并初始化界面或服务状态（onCreate）。
     @Override
     public void onCreate() {
         super.onCreate();
@@ -103,17 +105,20 @@ public class EmojiInputMethodService extends InputMethodService {
         preloadPinyinDictionary();
     }
 
+// 方法作用：处理 onEvaluateInputViewShown 对应的输入并返回或更新相关结果（onEvaluateInputViewShown）。
     @Override
     public boolean onEvaluateInputViewShown() {
         super.onEvaluateInputViewShown();
         return true;
     }
 
+// 方法作用：处理 onEvaluateFullscreenMode 对应的输入并返回或更新相关结果（onEvaluateFullscreenMode）。
     @Override
     public boolean onEvaluateFullscreenMode() {
         return false;
     }
 
+// 方法作用：处理 onCreateInputView 对应的输入并返回或更新相关结果（onCreateInputView）。
     @Override
     public View onCreateInputView() {
         FrameLayout root = new FrameLayout(this);
@@ -168,6 +173,7 @@ public class EmojiInputMethodService extends InputMethodService {
         return root;
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（refreshInputMode）。
     private void refreshInputMode() {
         if (contentContainer == null) {
             return;
@@ -204,6 +210,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：处理 rebuildToolbar 对应的输入并返回或更新相关结果（rebuildToolbar）。
     private void rebuildToolbar() {
         toolbarBody.removeAllViews();
         candidateScroll = null;
@@ -256,6 +263,7 @@ public class EmojiInputMethodService extends InputMethodService {
         updateToolbarStatus();
     }
 
+// 方法作用：把异步加载结果应用到当前界面或状态（applySurfaceTheme）。
     private void applySurfaceTheme() {
         boolean showBackground = textMode && customBackgroundActive;
         keyboardBackground.setVisibility(showBackground ? View.VISIBLE : View.GONE);
@@ -263,6 +271,7 @@ public class EmojiInputMethodService extends InputMethodService {
         toolbar.setBackgroundColor(showBackground ? 0x22000000 : toolbarColor());
     }
 
+// 方法作用：处理 preloadPinyinDictionary 对应的输入并返回或更新相关结果（preloadPinyinDictionary）。
     private void preloadPinyinDictionary() {
         dictionaryExecutor.execute(() -> {
             PinyinDictionary loaded = PinyinDictionary.load(getApplicationContext());
@@ -279,6 +288,7 @@ public class EmojiInputMethodService extends InputMethodService {
         });
     }
 
+// 方法作用：从文件、网络或内存加载数据（loadKeyboardBackgroundAsync）。
     private void loadKeyboardBackgroundAsync() {
         if (keyboardBackground == null || catalogExecutor == null) {
             return;
@@ -299,6 +309,7 @@ public class EmojiInputMethodService extends InputMethodService {
         });
     }
 
+// 方法作用：把异步加载结果应用到当前界面或状态（applyKeyboardBackground）。
     private void applyKeyboardBackground(int generation, long version, Bitmap bitmap) {
         if (destroyed || generation != backgroundGeneration) {
             if (bitmap != null) {
@@ -327,6 +338,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（updateToolbarStatus）。
     private void updateToolbarStatus() {
         if (toolbarStatus == null) {
             return;
@@ -344,6 +356,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：按生命周期释放线程、监听器和其他资源（onDestroy）。
     @Override
     public void onDestroy() {
         destroyed = true;
@@ -370,6 +383,7 @@ public class EmojiInputMethodService extends InputMethodService {
         super.onDestroy();
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createEmojiPanel）。
     private View createEmojiPanel() {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.HORIZONTAL);
@@ -449,6 +463,7 @@ public class EmojiInputMethodService extends InputMethodService {
         return root;
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createTextPanel）。
     private View createTextPanel() {
         if (textPage != 0) {
             return createSpecialPanel();
@@ -484,6 +499,7 @@ public class EmojiInputMethodService extends InputMethodService {
         return panel;
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addKeyRow）。
     private void addKeyRow(LinearLayout panel, String keys, float insetWeight, boolean withBackspace) {
         LinearLayout row = new LinearLayout(this);
         row.setGravity(Gravity.CENTER);
@@ -510,6 +526,7 @@ public class EmojiInputMethodService extends InputMethodService {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addLetterKey）。
     private void addLetterKey(LinearLayout row, String text, String baseKey) {
         Button key = button(text, "输入字母" + text, view -> appendPinyin(baseKey));
         key.setTextSize(23);
@@ -522,6 +539,7 @@ public class EmojiInputMethodService extends InputMethodService {
                 0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createSpecialPanel）。
     private View createSpecialPanel() {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -542,6 +560,7 @@ public class EmojiInputMethodService extends InputMethodService {
         return panel;
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addSpecialRows）。
     private void addSpecialRows(LinearLayout panel, String[] rows, int columns) {
         for (String values : rows) {
             LinearLayout row = new LinearLayout(this);
@@ -563,12 +582,14 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：显示或打开对应的交互界面（openTextPage）。
     private void openTextPage(int page) {
         commitPinyin();
         textPage = page;
         refreshInputMode();
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addControlKey）。
     private void addControlKey(
             LinearLayout row,
             String text,
@@ -588,6 +609,7 @@ public class EmojiInputMethodService extends InputMethodService {
         row.addView(key, layout);
     }
 
+// 方法作用：向当前拼音缓冲区追加输入并刷新候选（appendPinyin）。
     private void appendPinyin(String key) {
         if (englishMode) {
             commitText(englishUppercase ? key.toUpperCase(java.util.Locale.ROOT)
@@ -598,6 +620,7 @@ public class EmojiInputMethodService extends InputMethodService {
         renderCandidates();
     }
 
+// 方法作用：切换键盘模式并刷新相关界面（toggleLanguage）。
     private void toggleLanguage() {
         commitPinyin();
         englishMode = !englishMode;
@@ -605,11 +628,13 @@ public class EmojiInputMethodService extends InputMethodService {
         refreshInputMode();
     }
 
+// 方法作用：切换键盘模式并刷新相关界面（toggleCase）。
     private void toggleCase() {
         englishUppercase = !englishUppercase;
         refreshInputMode();
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteLast）。
     private void deleteLast() {
         if (pinyinBuffer.length() > 0) {
             pinyinBuffer.deleteCharAt(pinyinBuffer.length() - 1);
@@ -623,6 +648,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：构建并更新用户界面内容（renderCandidates）。
     private void renderCandidates() {
         if (candidateStrip == null || composingLabel == null) {
             return;
@@ -650,6 +676,7 @@ public class EmojiInputMethodService extends InputMethodService {
             return;
         }
         showCandidateMessage("候选检索中");
+        // 生成号用于丢弃过期异步结果，避免旧查询覆盖用户刚输入的新状态。
         dictionaryExecutor.execute(() -> {
             if (destroyed || generation != candidateGeneration) {
                 return;
@@ -659,6 +686,7 @@ public class EmojiInputMethodService extends InputMethodService {
         });
     }
 
+// 方法作用：把异步加载结果应用到当前界面或状态（applyCandidateResult）。
     private void applyCandidateResult(int generation, String pinyin, List<String> candidates) {
         if (destroyed || generation != candidateGeneration
                 || !textMode || !pinyin.equals(pinyinBuffer.toString())
@@ -682,6 +710,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：构建并更新用户界面内容（renderCandidateButtons）。
     private void renderCandidateButtons(List<String> candidates) {
         if (candidateStrip == null) {
             return;
@@ -701,6 +730,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（updateCandidateExpandButton）。
     private void updateCandidateExpandButton(boolean hasCandidates) {
         if (candidateExpandButton == null) {
             return;
@@ -712,6 +742,7 @@ public class EmojiInputMethodService extends InputMethodService {
                 candidateExpanded ? "收起候选词" : "展开全部候选词");
     }
 
+// 方法作用：更新对象状态或注册回调（setCandidateExpanded）。
     private void setCandidateExpanded(boolean expanded) {
         boolean canExpand = textMode && textPage == 0
                 && !currentCandidates.isEmpty()
@@ -729,6 +760,7 @@ public class EmojiInputMethodService extends InputMethodService {
                         ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
+// 方法作用：显示或打开对应的交互界面（showExpandedCandidatePanel）。
     private void showExpandedCandidatePanel() {
         if (!candidateExpanded || contentContainer == null) {
             return;
@@ -738,6 +770,7 @@ public class EmojiInputMethodService extends InputMethodService {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createExpandedCandidatePanel）。
     private View createExpandedCandidatePanel() {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -776,6 +809,7 @@ public class EmojiInputMethodService extends InputMethodService {
         return panel;
     }
 
+// 方法作用：显示或打开对应的交互界面（showCandidateMessage）。
     private void showCandidateMessage(String message) {
         candidateStrip.removeAllViews();
         updateCandidateExpandButton(false);
@@ -783,6 +817,7 @@ public class EmojiInputMethodService extends InputMethodService {
                 new LinearLayout.LayoutParams(dp(110), dp(40)));
     }
 
+// 方法作用：根据候选条件选择并返回目标项（chooseFirstCandidate）。
     private void chooseFirstCandidate() {
         if (pinyinBuffer.length() == 0) {
             commitText(" ");
@@ -801,6 +836,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：把文本或富内容提交到当前输入连接（commitCandidate）。
     private void commitCandidate(String candidate) {
         InputConnection connection = getCurrentInputConnection();
         if (connection != null) {
@@ -817,6 +853,7 @@ public class EmojiInputMethodService extends InputMethodService {
         renderCandidates();
     }
 
+// 方法作用：把文本或富内容提交到当前输入连接（commitPinyin）。
     private void commitPinyin() {
         if (pinyinBuffer.length() == 0) {
             return;
@@ -833,6 +870,7 @@ public class EmojiInputMethodService extends InputMethodService {
         renderCandidates();
     }
 
+// 方法作用：把文本或富内容提交到当前输入连接（commitText）。
     private void commitText(String text) {
         commitPinyin();
         InputConnection connection = getCurrentInputConnection();
@@ -841,6 +879,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：把当前选中的内容发送到目标输入框或分享面板（sendEnter）。
     private void sendEnter() {
         commitPinyin();
         InputConnection connection = getCurrentInputConnection();
@@ -858,6 +897,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：处理 onStartInput 对应的输入并返回或更新相关结果（onStartInput）。
     @Override
     public void onStartInput(EditorInfo attribute, boolean restarting) {
         super.onStartInput(attribute, restarting);
@@ -874,6 +914,7 @@ public class EmojiInputMethodService extends InputMethodService {
         updateCompatibilityStatus(attribute);
     }
 
+// 方法作用：处理 onStartInputView 对应的输入并返回或更新相关结果（onStartInputView）。
     @Override
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
@@ -882,6 +923,7 @@ public class EmojiInputMethodService extends InputMethodService {
         updateCompatibilityStatus(info);
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（reloadCatalogAsync）。
     private void reloadCatalogAsync() {
         if (galleryRail == null || packStrip == null || gridAdapter == null) {
             return;
@@ -900,6 +942,7 @@ public class EmojiInputMethodService extends InputMethodService {
         });
     }
 
+// 方法作用：把异步加载结果应用到当前界面或状态（applyCatalogResult）。
     private void applyCatalogResult(
             int generation,
             EmojiCatalog loaded,
@@ -915,6 +958,7 @@ public class EmojiInputMethodService extends InputMethodService {
         renderCatalog();
     }
 
+// 方法作用：把异步加载结果应用到当前界面或状态（applyCatalogFailure）。
     private void applyCatalogFailure(int generation) {
         if (destroyed || generation != catalogGeneration) {
             return;
@@ -930,6 +974,7 @@ public class EmojiInputMethodService extends InputMethodService {
         setStatus("表情库读取失败");
     }
 
+// 方法作用：构建并更新用户界面内容（renderCatalog）。
     private void renderCatalog() {
         renderGalleries();
         renderPacks();
@@ -937,6 +982,7 @@ public class EmojiInputMethodService extends InputMethodService {
         EmojiSelectionStore.save(this, selectedGalleryId, selectedPackId);
     }
 
+// 方法作用：构建并更新用户界面内容（renderGalleries）。
     private void renderGalleries() {
         galleryRail.removeAllViews();
         for (EmojiCatalog.Gallery gallery : catalog.getGalleries()) {
@@ -953,6 +999,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：构建并更新用户界面内容（renderPacks）。
     private void renderPacks() {
         packStrip.removeAllViews();
         List<EmojiCatalog.Pack> packs = catalog.getPacksForGallery(selectedGalleryId);
@@ -973,6 +1020,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：构建并更新用户界面内容（renderItems）。
     private void renderItems() {
         EmojiCatalog.Pack pack = selectedPack();
         if (pack == null) {
@@ -989,6 +1037,7 @@ public class EmojiInputMethodService extends InputMethodService {
         updateCompatibilityStatus(getCurrentInputEditorInfo());
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectGallery）。
     private void selectGallery(String galleryId) {
         selectedGalleryId = galleryId;
         List<EmojiCatalog.Pack> packs = catalog.getPacksForGallery(galleryId);
@@ -997,6 +1046,7 @@ public class EmojiInputMethodService extends InputMethodService {
         renderCatalog();
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectPack）。
     private void selectPack(String packId) {
         selectedPackId = packId;
         selectedItemId = firstItemId(selectedPack());
@@ -1005,6 +1055,7 @@ public class EmojiInputMethodService extends InputMethodService {
         EmojiSelectionStore.save(this, selectedGalleryId, selectedPackId);
     }
 
+// 方法作用：把当前选中的内容发送到目标输入框或分享面板（sendEmoji）。
     private void sendEmoji(EmojiCatalog.Item item) {
         InputConnection connection = getCurrentInputConnection();
         EditorInfo editorInfo = getCurrentInputEditorInfo();
@@ -1015,6 +1066,7 @@ public class EmojiInputMethodService extends InputMethodService {
         try {
             Uri uri = EmojiFileStore.getUri(this, item);
             String mimeType = item.getMimeType();
+            // 优先走标准 rich-content 提交；目标编辑器拒绝后再降级为分享流程。
             if (ImageSendPolicy.initialAction(supportsMimeType(editorInfo, mimeType))
                     == ImageSendPolicy.InitialAction.COMMIT) {
                 boolean committed;
@@ -1038,6 +1090,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：创建并发起图片分享流程（shareSelectedManually）。
     private void shareSelectedManually() {
         EmojiCatalog.Item item = selectedItem();
         if (item == null) {
@@ -1055,6 +1108,7 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：创建并发起图片分享流程（shareImage）。
     private void shareImage(
             EditorInfo editorInfo,
             Uri uri,
@@ -1074,10 +1128,12 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：显示或打开对应的交互界面（showShareResult）。
     private void showShareResult(String pathReason, String result) {
         showResult(TextUtils.isEmpty(pathReason) ? result : pathReason + "；" + result);
     }
 
+// 方法作用：把文本或富内容提交到当前输入连接（commitContent）。
     private boolean commitContent(
             InputConnection connection,
             EditorInfo editorInfo,
@@ -1093,6 +1149,7 @@ public class EmojiInputMethodService extends InputMethodService {
                 null);
     }
 
+// 方法作用：判断当前对象是否满足指定条件（supportsMimeType）。
     private boolean supportsMimeType(EditorInfo editorInfo, String mimeType) {
         return editorInfo != null && ImageSendPolicy.supportsMimeType(
                 EditorInfoCompat.getContentMimeTypes(editorInfo),
@@ -1100,6 +1157,7 @@ public class EmojiInputMethodService extends InputMethodService {
                 ClipDescription::compareMimeTypes);
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（updateCompatibilityStatus）。
     private void updateCompatibilityStatus(EditorInfo editorInfo) {
         if (compatibilityStatus == null) {
             return;
@@ -1116,14 +1174,17 @@ public class EmojiInputMethodService extends InputMethodService {
         }
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedPack）。
     private EmojiCatalog.Pack selectedPack() {
         return catalog == null ? null : catalog.getPack(selectedPackId);
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedItem）。
     private EmojiCatalog.Item selectedItem() {
         return findItem(selectedPack(), selectedItemId);
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findItem）。
     private static EmojiCatalog.Item findItem(EmojiCatalog.Pack pack, String itemId) {
         if (pack != null && itemId != null) {
             for (EmojiCatalog.Item item : pack.getItems()) {
@@ -1135,16 +1196,19 @@ public class EmojiInputMethodService extends InputMethodService {
         return null;
     }
 
+// 方法作用：取得集合中第一个可用元素的标识（firstItemId）。
     private static String firstItemId(EmojiCatalog.Pack pack) {
         return pack == null || pack.getItems().isEmpty()
                 ? null : pack.getItems().get(0).getId();
     }
 
+// 方法作用：根据选择状态更新控件的颜色和样式（styleSelection）。
     private void styleSelection(Button button, boolean selected) {
         button.setBackgroundColor(selected ? selectedColor() : railColor());
         button.setTextColor(selected ? selectedTextColor() : primaryTextColor());
     }
 
+// 方法作用：创建统一样式的按钮并绑定点击监听器（button）。
     private Button button(String text, String description, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(text);
@@ -1157,6 +1221,7 @@ public class EmojiInputMethodService extends InputMethodService {
         return button;
     }
 
+// 方法作用：创建统一样式的文本标签（label）。
     private TextView label(String text, int size) {
         TextView label = new TextView(this);
         label.setText(text);
@@ -1169,37 +1234,45 @@ public class EmojiInputMethodService extends InputMethodService {
         return label;
     }
 
+// 方法作用：更新对象状态或注册回调（setStatus）。
     private void setStatus(String message) {
         if (compatibilityStatus != null) {
             compatibilityStatus.setText(message);
         }
     }
 
+// 方法作用：显示或打开对应的交互界面（showResult）。
     private void showResult(String message) {
         setStatus(message);
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
 
+// 方法作用：处理 surfaceColor 对应的输入并返回或更新相关结果（surfaceColor）。
     private int surfaceColor() {
         return isNightMode() ? 0xff202124 : 0xffd9dde3;
     }
 
+// 方法作用：在相关数据表示之间进行转换（toolbarColor）。
     private int toolbarColor() {
         return isNightMode() ? 0xff24262a : Color.WHITE;
     }
 
+// 方法作用：处理 railColor 对应的输入并返回或更新相关结果（railColor）。
     private int railColor() {
         return isNightMode() ? 0xff242424 : 0xfff0f1f3;
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedColor）。
     private int selectedColor() {
         return isNightMode() ? 0xff35506f : 0xffdbeafe;
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedTextColor）。
     private int selectedTextColor() {
         return isNightMode() ? Color.WHITE : 0xff12345b;
     }
 
+// 方法作用：处理 primaryTextColor 对应的输入并返回或更新相关结果（primaryTextColor）。
     private int primaryTextColor() {
         if (textMode && customBackgroundActive) {
             return Color.WHITE;
@@ -1207,6 +1280,7 @@ public class EmojiInputMethodService extends InputMethodService {
         return isNightMode() ? 0xfff2f2f2 : 0xff202124;
     }
 
+// 方法作用：处理 secondaryTextColor 对应的输入并返回或更新相关结果（secondaryTextColor）。
     private int secondaryTextColor() {
         if (textMode && customBackgroundActive) {
             return 0xddffffff;
@@ -1214,6 +1288,7 @@ public class EmojiInputMethodService extends InputMethodService {
         return isNightMode() ? 0xffb7b7b7 : 0xff686b70;
     }
 
+// 方法作用：处理 unifiedLetterAreaBackground 对应的输入并返回或更新相关结果（unifiedLetterAreaBackground）。
     private GradientDrawable unifiedLetterAreaBackground() {
         GradientDrawable background = new GradientDrawable();
         background.setColor(textMode && customBackgroundActive
@@ -1223,6 +1298,7 @@ public class EmojiInputMethodService extends InputMethodService {
         return background;
     }
 
+// 方法作用：处理 borderlessKeyBackground 对应的输入并返回或更新相关结果（borderlessKeyBackground）。
     private RippleDrawable borderlessKeyBackground() {
         GradientDrawable content = new GradientDrawable();
         content.setColor(Color.TRANSPARENT);
@@ -1234,6 +1310,7 @@ public class EmojiInputMethodService extends InputMethodService {
                 mask);
     }
 
+// 方法作用：处理 controlKeyBackground 对应的输入并返回或更新相关结果（controlKeyBackground）。
     private RippleDrawable controlKeyBackground() {
         GradientDrawable content = new GradientDrawable();
         content.setColor(textMode && customBackgroundActive
@@ -1249,18 +1326,21 @@ public class EmojiInputMethodService extends InputMethodService {
                 mask);
     }
 
+// 方法作用：判断当前对象是否满足指定条件（isNightMode）。
     private boolean isNightMode() {
         int mask = getResources().getConfiguration().uiMode
                 & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
         return mask == android.content.res.Configuration.UI_MODE_NIGHT_YES;
     }
 
+// 方法作用：创建匹配父容器尺寸的布局参数（matchWrap）。
     private LinearLayout.LayoutParams matchWrap() {
         return new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
+// 方法作用：处理 dp 对应的输入并返回或更新相关结果（dp）。
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }

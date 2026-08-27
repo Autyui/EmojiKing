@@ -25,7 +25,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-/** Minimal client for the EmojiKing image-hosting API. */
+/** EmojiKing 图片托管接口的轻量客户端。 */
+// 类作用：定义 ImageHostingClient，承载所在模块的主要职责。
 public final class ImageHostingClient {
     public static final long MAX_UPLOAD_BYTES = 3L * 1024L * 1024L;
     public static final String DEFAULT_BASE_URL =
@@ -39,6 +40,7 @@ public final class ImageHostingClient {
 
     private final String baseUrl;
 
+// 方法作用：初始化 ImageHostingClient 对象并建立其运行所需状态。
     public ImageHostingClient(String baseUrl) {
         if (baseUrl == null || baseUrl.trim().isEmpty()) {
             throw new IllegalArgumentException("云端地址不能为空");
@@ -56,11 +58,13 @@ public final class ImageHostingClient {
         this.baseUrl = normalized.replaceAll("/+$", "");
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getConfiguredBaseUrl）。
     public static String getConfiguredBaseUrl(Context context) {
         return context.getSharedPreferences(PREFERENCES, 0)
                 .getString(BASE_URL, DEFAULT_BASE_URL);
     }
 
+// 方法作用：校验并持久化用户提供的数据（saveConfiguredBaseUrl）。
     public static void saveConfiguredBaseUrl(Context context, String baseUrl) {
         android.content.SharedPreferences.Editor editor = context.getSharedPreferences(
                 PREFERENCES, 0).edit();
@@ -72,6 +76,7 @@ public final class ImageHostingClient {
         editor.apply();
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getMachineCode）。
     public static String getMachineCode(Context context) {
         String androidId = Settings.Secure.getString(
                 context.getContentResolver(), Settings.Secure.ANDROID_ID);
@@ -89,6 +94,7 @@ public final class ImageHostingClient {
         return generated;
     }
 
+// 方法作用：处理 upload 对应的输入并返回或更新相关结果（upload）。
     public UploadResult upload(
             String machineCode,
             File file,
@@ -105,6 +111,7 @@ public final class ImageHostingClient {
         payload.addProperty("machine_code", requireMachineCode(machineCode));
         payload.addProperty("filename", filename == null ? file.getName() : filename);
         payload.addProperty("content_type", contentType);
+        // 服务端接口使用无换行 Base64，避免 JSON 字符串携带不可预期的换行符。
         payload.addProperty("data", Base64.encodeToString(content, Base64.NO_WRAP));
         JsonObject result = requestJson("/api/upload", "POST", payload.toString());
         String path = requiredString(result, "path");
@@ -112,6 +119,7 @@ public final class ImageHostingClient {
         return new UploadResult(path, url);
     }
 
+// 方法作用：处理 list 对应的输入并返回或更新相关结果（list）。
     public List<RemoteImage> list(String machineCode) throws IOException {
         String encoded = URLEncoder.encode(requireMachineCode(machineCode), "UTF-8");
         JsonObject result = requestJson("/api/images?machine_code=" + encoded, "GET", null);
@@ -135,6 +143,7 @@ public final class ImageHostingClient {
         return Collections.unmodifiableList(images);
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（delete）。
     public void delete(String machineCode, RemoteImage image) throws IOException {
         if (image == null || image.getPath().trim().isEmpty()) {
             throw new IOException("待删除云端图片无效");
@@ -145,6 +154,7 @@ public final class ImageHostingClient {
         requestJson("/api/delete", "DELETE", payload.toString());
     }
 
+// 方法作用：处理 download 对应的输入并返回或更新相关结果（download）。
     public void download(RemoteImage image, File destination) throws IOException {
         if (image == null || destination == null) {
             throw new IOException("云端图片参数无效");
@@ -163,6 +173,7 @@ public final class ImageHostingClient {
                 int read;
                 while ((read = input.read(buffer)) != -1) {
                     total += read;
+                    // 同时限制响应体大小，防止异常云端响应耗尽本地磁盘。
                     if (total > EmojiFileStore.MAX_IMAGE_BYTES) {
                         throw new IOException("云端图片超过本地 20 MiB 限制");
                     }
@@ -179,6 +190,7 @@ public final class ImageHostingClient {
         }
     }
 
+// 方法作用：处理 requestJson 对应的输入并返回或更新相关结果（requestJson）。
     private JsonObject requestJson(String path, String method, String body) throws IOException {
         HttpURLConnection connection = open(new URL(baseUrl + path), method);
         try {
@@ -207,6 +219,7 @@ public final class ImageHostingClient {
         }
     }
 
+// 方法作用：显示或打开对应的交互界面（open）。
     private HttpURLConnection open(URL url, String method) throws IOException {
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod(method);
@@ -217,6 +230,7 @@ public final class ImageHostingClient {
         return connection;
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（ensureSuccess）。
     private static void ensureSuccess(HttpURLConnection connection) throws IOException {
         int status = connection.getResponseCode();
         if (status < 200 || status >= 300) {
@@ -229,6 +243,7 @@ public final class ImageHostingClient {
         }
     }
 
+// 方法作用：处理 extractError 对应的输入并返回或更新相关结果（extractError）。
     private static String extractError(String response) {
         if (response == null || response.trim().isEmpty()) {
             return "";
@@ -239,11 +254,12 @@ public final class ImageHostingClient {
                 return ": " + parsed.getAsJsonObject().get("error").getAsString();
             }
         } catch (RuntimeException ignored) {
-            // The HTTP status remains useful when a provider returns non-JSON text.
+            // 云端返回非 JSON 文本时，HTTP 状态码仍能提供有效的失败信息。
         }
         return "";
     }
 
+// 方法作用：从输入源读取并转换数据（readText）。
     private static String readText(InputStream input) throws IOException {
         try (InputStream source = input; ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[8 * 1024];
@@ -255,6 +271,7 @@ public final class ImageHostingClient {
         }
     }
 
+// 方法作用：从输入源读取并转换数据（readFile）。
     private static byte[] readFile(File file) throws IOException {
         try (FileInputStream input = new FileInputStream(file);
              ByteArrayOutputStream output = new ByteArrayOutputStream((int) file.length())) {
@@ -267,6 +284,7 @@ public final class ImageHostingClient {
         }
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requireMachineCode）。
     private static String requireMachineCode(String value) throws IOException {
         String machineCode = value == null ? "" : value.trim();
         if (!machineCode.matches("[a-zA-Z0-9._:-]{1,128}")) {
@@ -275,6 +293,7 @@ public final class ImageHostingClient {
         return machineCode;
     }
 
+// 方法作用：读取 JSON 中必需的字符串字段并校验类型（requiredString）。
     private static String requiredString(JsonObject object, String name) throws IOException {
         String value = optionalString(object, name);
         if (value.isEmpty()) {
@@ -283,52 +302,63 @@ public final class ImageHostingClient {
         return value;
     }
 
+// 方法作用：读取 JSON 中可选的字符串字段并处理缺省值（optionalString）。
     private static String optionalString(JsonObject object, String name) {
         JsonElement value = object.get(name);
         return value == null || value.isJsonNull() ? "" : value.getAsString().trim();
     }
 
+// 类作用：定义 UploadResult，承载所在模块的主要职责。
     public static final class UploadResult {
         private final String path;
         private final String url;
 
+// 方法作用：初始化 UploadResult 对象并建立其运行所需状态。
         private UploadResult(String path, String url) {
             this.path = path;
             this.url = url;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getPath）。
         public String getPath() {
             return path;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getUrl）。
         public String getUrl() {
             return url;
         }
     }
 
+// 类作用：定义 RemoteImage，承载所在模块的主要职责。
     public static final class RemoteImage {
         private final String path;
         private final String url;
         private final long size;
 
+// 方法作用：初始化 RemoteImage 对象并建立其运行所需状态。
         private RemoteImage(String path, String url, long size) {
             this.path = path;
             this.url = url;
             this.size = size;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getPath）。
         public String getPath() {
             return path;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getUrl）。
         public String getUrl() {
             return url;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getSize）。
         public long getSize() {
             return size;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getFileName）。
         public String getFileName() {
             int slash = path.lastIndexOf('/');
             return slash < 0 ? path : path.substring(slash + 1);

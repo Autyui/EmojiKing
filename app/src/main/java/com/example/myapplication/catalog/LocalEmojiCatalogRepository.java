@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.UUID;
 
 /** Owns the versioned catalog and its image files under application-private storage. */
+// 类作用：定义 LocalEmojiCatalogRepository，承载所在模块的主要职责。
 public final class LocalEmojiCatalogRepository {
     public static final String DEFAULT_GALLERY_ID = "gallery-local";
     public static final String DEFAULT_PACK_ID = "pack-default";
@@ -30,6 +31,7 @@ public final class LocalEmojiCatalogRepository {
     private final AtomicTextFile catalogFile;
     private EmojiCatalog cachedCatalog;
 
+// 方法作用：初始化 LocalEmojiCatalogRepository 对象并建立其运行所需状态。
     public LocalEmojiCatalogRepository(File applicationFilesDirectory) {
         this(new File(applicationFilesDirectory, LIBRARY_DIRECTORY),
                 new EmojiCatalogJsonCodec(), null);
@@ -47,6 +49,7 @@ public final class LocalEmojiCatalogRepository {
                 : catalogFile;
     }
 
+// 方法作用：从文件、网络或内存加载数据（loadDefaultEmoji）。
     public synchronized StoredEmoji loadDefaultEmoji(
             File legacyImage,
             String legacyMimeType) throws IOException {
@@ -58,11 +61,13 @@ public final class LocalEmojiCatalogRepository {
         return new StoredEmoji(item, resolveImageFile(item));
     }
 
+// 方法作用：替换已有图片或目录记录并保持索引一致（replaceDefaultEmoji）。
     public synchronized StoredEmoji replaceDefaultEmoji(File source, String mimeType)
             throws IOException {
         return replaceDefaultEmoji(source, source == null ? null : source.getName(), mimeType);
     }
 
+// 方法作用：替换已有图片或目录记录并保持索引一致（replaceDefaultEmoji）。
     public synchronized StoredEmoji replaceDefaultEmoji(
             File source,
             String displayName,
@@ -92,6 +97,7 @@ public final class LocalEmojiCatalogRepository {
         return new StoredEmoji(replacementItem, replacement.file);
     }
 
+// 方法作用：校验并导入外部数据（importEmoji）。
     public synchronized ImportResult importEmoji(
             String packId,
             File source,
@@ -127,6 +133,7 @@ public final class LocalEmojiCatalogRepository {
         return ImportResult.imported(new StoredEmoji(item, managed.file));
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createGallery）。
     public synchronized EmojiCatalog.Gallery createGallery(String name) throws IOException {
         EmojiCatalog current = requireCatalog();
         EmojiCatalog.Gallery gallery = new EmojiCatalog.Gallery(
@@ -138,11 +145,13 @@ public final class LocalEmojiCatalogRepository {
         return gallery;
     }
 
+// 方法作用：修改目标图库或表情包的名称并保存变更（renameGallery）。
     public synchronized void renameGallery(String galleryId, String name) throws IOException {
         EmojiCatalog current = requireCatalog();
         writeCatalog(EmojiCatalogEditor.renameGallery(current, galleryId, name));
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteGallery）。
     public synchronized void deleteGallery(String galleryId) throws IOException {
         EmojiCatalog current = requireCatalog();
         if (current.getGalleries().size() <= 1) {
@@ -151,6 +160,7 @@ public final class LocalEmojiCatalogRepository {
         writeCatalog(EmojiCatalogEditor.removeGallery(current, galleryId));
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createPack）。
     public synchronized EmojiCatalog.Pack createPack(String galleryId, String name)
             throws IOException {
         return createPacks(
@@ -158,6 +168,7 @@ public final class LocalEmojiCatalogRepository {
                 Collections.singletonList(name)).get(0);
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createPacks）。
     public synchronized List<EmojiCatalog.Pack> createPacks(
             List<String> galleryIds,
             List<String> names) throws IOException {
@@ -182,6 +193,7 @@ public final class LocalEmojiCatalogRepository {
         return Collections.unmodifiableList(created);
     }
 
+// 方法作用：建立图库与表情包之间的关联并校验引用（linkPacksToGallery）。
     public synchronized void linkPacksToGallery(
             String galleryId,
             List<String> packIds) throws IOException {
@@ -197,11 +209,13 @@ public final class LocalEmojiCatalogRepository {
         writeCatalog(updated);
     }
 
+// 方法作用：解除图库与表情包之间的关联并保存变更（unlinkPackFromGallery）。
     public synchronized void unlinkPackFromGallery(String galleryId, String packId)
             throws IOException {
         unlinkPacksFromGallery(galleryId, Collections.singletonList(packId));
     }
 
+// 方法作用：解除图库与表情包之间的关联并保存变更（unlinkPacksFromGallery）。
     public synchronized void unlinkPacksFromGallery(
             String galleryId, List<String> packIds) throws IOException {
         EmojiCatalog current = requireCatalog();
@@ -214,11 +228,13 @@ public final class LocalEmojiCatalogRepository {
         writeCatalog(updated);
     }
 
+// 方法作用：修改目标图库或表情包的名称并保存变更（renamePack）。
     public synchronized void renamePack(String packId, String name) throws IOException {
         EmojiCatalog current = requireCatalog();
         writeCatalog(EmojiCatalogEditor.renamePack(current, packId, name));
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deletePack）。
     public synchronized void deletePack(String packId) throws IOException {
         if (DEFAULT_PACK_ID.equals(packId)) {
             throw new IOException("The default emoji pack cannot be deleted");
@@ -239,6 +255,7 @@ public final class LocalEmojiCatalogRepository {
         discardStaged(staged);
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（updateItemNote）。
     public synchronized void updateItemNote(String itemId, String note) throws IOException {
         EmojiCatalog current = requireCatalog();
         EmojiCatalog.Item item = requireItem(current, itemId);
@@ -248,6 +265,7 @@ public final class LocalEmojiCatalogRepository {
         writeCatalog(EmojiCatalogEditor.replaceItem(current, itemId, updatedItem));
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteItem）。
     public synchronized void deleteItem(String itemId) throws IOException {
         EmojiCatalog current = requireCatalog();
         if (countItems(current) <= 1) {
@@ -265,6 +283,7 @@ public final class LocalEmojiCatalogRepository {
         discardStaged(Collections.singletonList(staged));
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteItems）。
     public synchronized void deleteItems(String packId, List<String> itemIds) throws IOException {
         EmojiCatalog current = requireCatalog();
         EmojiCatalog.Pack pack = requirePack(current, packId);
@@ -298,15 +317,18 @@ public final class LocalEmojiCatalogRepository {
         discardStaged(staged);
     }
 
+// 方法作用：从文件、网络或内存加载数据（loadCatalog）。
     public synchronized EmojiCatalog loadCatalog() throws IOException {
         return requireCatalog();
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getStoredEmoji）。
     public synchronized StoredEmoji getStoredEmoji(String itemId) throws IOException {
         EmojiCatalog.Item item = requireItem(requireCatalog(), itemId);
         return new StoredEmoji(item, resolveImageFile(item));
     }
 
+// 方法作用：处理 resolveImageFile 对应的输入并返回或更新相关结果（resolveImageFile）。
     public File resolveImageFile(EmojiCatalog.Item item) throws IOException {
         File libraryRoot = libraryDirectory.getCanonicalFile();
         File imageRoot = imagesDirectory.getCanonicalFile();
@@ -321,6 +343,7 @@ public final class LocalEmojiCatalogRepository {
         return resolved;
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requireCatalog）。
     private EmojiCatalog requireCatalog() throws IOException {
         EmojiCatalog catalog = loadCatalogOrNull();
         if (catalog == null) {
@@ -329,6 +352,7 @@ public final class LocalEmojiCatalogRepository {
         return catalog;
     }
 
+// 方法作用：从文件、网络或内存加载数据（loadCatalogOrNull）。
     private EmojiCatalog loadCatalogOrNull() throws IOException {
         if (cachedCatalog != null) {
             return cachedCatalog;
@@ -343,6 +367,7 @@ public final class LocalEmojiCatalogRepository {
         return cachedCatalog;
     }
 
+// 方法作用：把旧版本数据迁移到当前目录和清单格式（migrateLegacyImage）。
     private EmojiCatalog migrateLegacyImage(File legacyImage, String mimeType) throws IOException {
         validateSource(legacyImage, mimeType);
         ManagedImage managed = copyManagedImage(
@@ -364,6 +389,7 @@ public final class LocalEmojiCatalogRepository {
         return catalog;
     }
 
+// 方法作用：把文本或富内容提交到当前输入连接（commitWithNewFile）。
     private void commitWithNewFile(EmojiCatalog catalog, File newFile) throws IOException {
         try {
             writeCatalog(catalog);
@@ -373,11 +399,13 @@ public final class LocalEmojiCatalogRepository {
         }
     }
 
+// 方法作用：将对象转换后写入目标存储（writeCatalog）。
     private void writeCatalog(EmojiCatalog catalog) throws IOException {
         catalogFile.write(codec.encode(catalog));
         cachedCatalog = catalog;
     }
 
+// 方法作用：在受控范围内复制输入数据（copyManagedImage）。
     private ManagedImage copyManagedImage(
             File source,
             String mimeType,
@@ -393,6 +421,7 @@ public final class LocalEmojiCatalogRepository {
         File temporary = File.createTempFile("import-", ".tmp", destinationDirectory);
         try {
             copyFile(source, temporary);
+            // 先写入同目录临时文件，再原子改名，避免目录中出现半写入图片。
             if (!temporary.renameTo(destination)) {
                 throw new IOException("Cannot activate the managed image");
             }
@@ -409,6 +438,7 @@ public final class LocalEmojiCatalogRepository {
         }
     }
 
+// 方法作用：在受控范围内复制输入数据（copyFile）。
     private static void copyFile(File source, File destination) throws IOException {
         try (FileInputStream input = new FileInputStream(source);
              FileOutputStream output = new FileOutputStream(destination)) {
@@ -422,6 +452,7 @@ public final class LocalEmojiCatalogRepository {
         }
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（validateSource）。
     private static void validateSource(File source, String mimeType) throws IOException {
         if (source == null || !source.isFile() || source.length() <= 0) {
             throw new IOException("Emoji source image is missing or empty");
@@ -432,6 +463,7 @@ public final class LocalEmojiCatalogRepository {
         extensionForMime(mimeType);
     }
 
+// 方法作用：处理 extensionForMime 对应的输入并返回或更新相关结果（extensionForMime）。
     private static String extensionForMime(String mimeType) throws IOException {
         String normalized = mimeType.toLowerCase(Locale.US);
         if ("image/png".equals(normalized)) {
@@ -449,6 +481,7 @@ public final class LocalEmojiCatalogRepository {
         throw new IOException("Unsupported emoji image MIME type: " + mimeType);
     }
 
+// 方法作用：在相关数据表示之间进行转换（toRelativePath）。
     private String toRelativePath(File file) throws IOException {
         String root = libraryDirectory.getCanonicalPath() + File.separator;
         String path = file.getCanonicalPath();
@@ -458,6 +491,7 @@ public final class LocalEmojiCatalogRepository {
         return path.substring(root.length()).replace(File.separatorChar, '/');
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findByDigest）。
     private StoredEmoji findByDigest(EmojiCatalog.Pack pack, String digest) throws IOException {
         for (EmojiCatalog.Item item : pack.getItems()) {
             File file = resolveImageFile(item);
@@ -468,6 +502,7 @@ public final class LocalEmojiCatalogRepository {
         return null;
     }
 
+// 方法作用：计算文件内容的 SHA-256 摘要用于去重（sha256）。
     private static String sha256(File file) throws IOException {
         MessageDigest digest;
         try {
@@ -489,6 +524,7 @@ public final class LocalEmojiCatalogRepository {
         return result.toString();
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findReplaceablePlaceholder）。
     private static EmojiCatalog.Item findReplaceablePlaceholder(
             EmojiCatalog catalog,
             String packId) {
@@ -499,6 +535,7 @@ public final class LocalEmojiCatalogRepository {
         return item != null && DEFAULT_ITEM_NAME.equals(item.getName()) ? item : null;
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findCurrentItem）。
     private static EmojiCatalog.Item findCurrentItem(EmojiCatalog catalog) throws IOException {
         EmojiCatalog.Item first = null;
         for (EmojiCatalog.Pack pack : catalog.getPacks()) {
@@ -517,6 +554,7 @@ public final class LocalEmojiCatalogRepository {
         return first;
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findPackId）。
     private static String findPackId(EmojiCatalog catalog, String itemId) throws IOException {
         for (EmojiCatalog.Pack pack : catalog.getPacks()) {
             for (EmojiCatalog.Item item : pack.getItems()) {
@@ -528,6 +566,7 @@ public final class LocalEmojiCatalogRepository {
         throw new IOException("Emoji does not belong to a pack");
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（validateCatalogFiles）。
     private void validateCatalogFiles(EmojiCatalog catalog) throws IOException {
         for (EmojiCatalog.Pack pack : catalog.getPacks()) {
             for (EmojiCatalog.Item item : pack.getItems()) {
@@ -536,6 +575,7 @@ public final class LocalEmojiCatalogRepository {
         }
     }
 
+// 方法作用：把待删除文件移动到可恢复的暂存位置（stageFiles）。
     private List<StagedFile> stageFiles(List<EmojiCatalog.Item> items) throws IOException {
         List<StagedFile> staged = new ArrayList<>();
         try {
@@ -549,6 +589,7 @@ public final class LocalEmojiCatalogRepository {
         }
     }
 
+// 方法作用：把待删除文件移动到可恢复的暂存位置（stageFile）。
     private StagedFile stageFile(File original) throws IOException {
         File trash = new File(libraryDirectory, ".trash");
         if (!trash.exists() && !trash.mkdirs()) {
@@ -561,6 +602,7 @@ public final class LocalEmojiCatalogRepository {
         return new StagedFile(original, staged);
     }
 
+// 方法作用：从暂存位置恢复文件并保留异常上下文（restoreStaged）。
     private static void restoreStaged(List<StagedFile> staged, IOException originalFailure)
             throws IOException {
         for (int index = staged.size() - 1; index >= 0; index--) {
@@ -574,12 +616,14 @@ public final class LocalEmojiCatalogRepository {
         }
     }
 
+// 方法作用：清理已完成操作留下的暂存文件（discardStaged）。
     private static void discardStaged(List<StagedFile> staged) {
         for (StagedFile file : staged) {
             deleteQuietly(file.staged);
         }
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requireGallery）。
     private static EmojiCatalog.Gallery requireGallery(
             EmojiCatalog catalog,
             String galleryId) throws IOException {
@@ -591,6 +635,7 @@ public final class LocalEmojiCatalogRepository {
         throw new IOException("Gallery does not exist: " + galleryId);
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requirePack）。
     private static EmojiCatalog.Pack requirePack(EmojiCatalog catalog, String packId)
             throws IOException {
         EmojiCatalog.Pack pack = catalog.getPack(packId);
@@ -600,6 +645,7 @@ public final class LocalEmojiCatalogRepository {
         return pack;
     }
 
+// 方法作用：校验前置条件并在不满足时报告明确错误（requireItem）。
     private static EmojiCatalog.Item requireItem(EmojiCatalog catalog, String itemId)
             throws IOException {
         EmojiCatalog.Item item = findItemOrNull(catalog, itemId);
@@ -609,6 +655,7 @@ public final class LocalEmojiCatalogRepository {
         return item;
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findItemOrNull）。
     private static EmojiCatalog.Item findItemOrNull(EmojiCatalog catalog, String itemId) {
         for (EmojiCatalog.Pack pack : catalog.getPacks()) {
             for (EmojiCatalog.Item item : pack.getItems()) {
@@ -620,6 +667,7 @@ public final class LocalEmojiCatalogRepository {
         return null;
     }
 
+// 方法作用：统计当前集合中的元素数量（countItems）。
     private static int countItems(EmojiCatalog catalog) {
         int count = 0;
         for (EmojiCatalog.Pack pack : catalog.getPacks()) {
@@ -628,6 +676,7 @@ public final class LocalEmojiCatalogRepository {
         return count;
     }
 
+// 方法作用：计算下一个可用的排序序号（nextGalleryOrder）。
     private static int nextGalleryOrder(EmojiCatalog catalog) {
         int maximum = -1;
         for (EmojiCatalog.Gallery gallery : catalog.getGalleries()) {
@@ -636,6 +685,7 @@ public final class LocalEmojiCatalogRepository {
         return maximum + 1;
     }
 
+// 方法作用：计算下一个可用的排序序号（nextPackOrder）。
     private static int nextPackOrder(EmojiCatalog catalog) {
         int maximum = -1;
         for (EmojiCatalog.Pack pack : catalog.getPacks()) {
@@ -644,6 +694,7 @@ public final class LocalEmojiCatalogRepository {
         return maximum + 1;
     }
 
+// 方法作用：计算下一个可用的排序序号（nextItemOrder）。
     private static int nextItemOrder(EmojiCatalog.Pack pack) {
         int maximum = -1;
         for (EmojiCatalog.Item item : pack.getItems()) {
@@ -652,6 +703,7 @@ public final class LocalEmojiCatalogRepository {
         return maximum + 1;
     }
 
+// 方法作用：生成不会与已有记录冲突的标识符集合（uniqueRequiredIds）。
     private static List<String> uniqueRequiredIds(List<String> ids, String type)
             throws IOException {
         if (ids == null || ids.isEmpty()) {
@@ -670,6 +722,7 @@ public final class LocalEmojiCatalogRepository {
         return result;
     }
 
+// 方法作用：清理并规范化输入值（normalizeNames）。
     private static List<String> normalizeNames(List<String> names) throws IOException {
         if (names == null || names.isEmpty()) {
             throw new IOException("At least one emoji pack name is required");
@@ -688,6 +741,7 @@ public final class LocalEmojiCatalogRepository {
         return result;
     }
 
+// 方法作用：清理并规范化输入值（normalizeDisplayName）。
     private static String normalizeDisplayName(String name) throws IOException {
         if (name == null || name.trim().isEmpty()) {
             throw new IOException("Display name is required");
@@ -696,71 +750,86 @@ public final class LocalEmojiCatalogRepository {
         return normalized.length() > 160 ? normalized.substring(0, 160) : normalized;
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteQuietly）。
     private static void deleteQuietly(File file) {
         if (file != null && file.exists()) {
             file.delete();
         }
     }
 
+// 类作用：定义 ManagedImage，承载所在模块的主要职责。
     private static final class ManagedImage {
         private final File file;
         private final String relativePath;
 
+// 方法作用：初始化 ManagedImage 对象并建立其运行所需状态。
         private ManagedImage(File file, String relativePath) {
             this.file = file;
             this.relativePath = relativePath;
         }
     }
 
+// 类作用：定义 StagedFile，承载所在模块的主要职责。
     private static final class StagedFile {
         private final File original;
         private final File staged;
 
+// 方法作用：初始化 StagedFile 对象并建立其运行所需状态。
         private StagedFile(File original, File staged) {
             this.original = original;
             this.staged = staged;
         }
     }
 
+// 类作用：定义 ImportResult，承载所在模块的主要职责。
     public static final class ImportResult {
         private final boolean duplicate;
         private final StoredEmoji emoji;
 
+// 方法作用：初始化 ImportResult 对象并建立其运行所需状态。
         private ImportResult(boolean duplicate, StoredEmoji emoji) {
             this.duplicate = duplicate;
             this.emoji = emoji;
         }
 
+// 方法作用：校验并导入外部数据（imported）。
         private static ImportResult imported(StoredEmoji emoji) {
             return new ImportResult(false, emoji);
         }
 
+// 方法作用：判断输入是否与已有内容重复（duplicate）。
         private static ImportResult duplicate(StoredEmoji emoji) {
             return new ImportResult(true, emoji);
         }
 
+// 方法作用：判断当前对象是否满足指定条件（isDuplicate）。
         public boolean isDuplicate() {
             return duplicate;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getEmoji）。
         public StoredEmoji getEmoji() {
             return emoji;
         }
     }
 
+// 类作用：定义 StoredEmoji，承载所在模块的主要职责。
     public static final class StoredEmoji {
         private final EmojiCatalog.Item item;
         private final File file;
 
+// 方法作用：初始化 StoredEmoji 对象并建立其运行所需状态。
         private StoredEmoji(EmojiCatalog.Item item, File file) {
             this.item = item;
             this.file = file;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getItem）。
         public EmojiCatalog.Item getItem() {
             return item;
         }
 
+// 方法作用：读取并返回持久化或运行时状态（getFile）。
         public File getFile() {
             return file;
         }

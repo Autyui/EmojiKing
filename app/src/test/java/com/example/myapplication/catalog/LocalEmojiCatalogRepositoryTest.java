@@ -15,10 +15,12 @@ import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+// 类作用：定义 LocalEmojiCatalogRepositoryTest，承载所在模块的主要职责。
 public class LocalEmojiCatalogRepositoryTest {
     @Rule
     public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
+// 方法作用：处理 migrationCopiesLegacyImageAndIsIdempotent 对应的输入并返回或更新相关结果（migrationCopiesLegacyImageAndIsIdempotent）。
     @Test
     public void migrationCopiesLegacyImageAndIsIdempotent() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("files");
@@ -41,6 +43,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertEquals(1, countFiles(new File(filesDirectory, "emoji-library/images")));
     }
 
+// 方法作用：替换已有图片或目录记录并保持索引一致（replacementPersistsAcrossRepositoryRestart）。
     @Test
     public void replacementPersistsAcrossRepositoryRestart() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("replace-files");
@@ -60,6 +63,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertTrue(replacement.exists());
     }
 
+// 方法作用：取得集合中第一个可用元素的标识（firstImportReplacesPlaceholderAndKeepsSmallImageDisplayName）。
     @Test
     public void firstImportReplacesPlaceholderAndKeepsSmallImageDisplayName() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("small-import-files");
@@ -84,6 +88,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertEquals(1, countItems(repository.loadCatalog()));
     }
 
+// 方法作用：判断输入是否与已有内容重复（duplicateContentDoesNotCreateAnotherRecordOrFile）。
     @Test
     public void duplicateContentDoesNotCreateAnotherRecordOrFile() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("duplicate-files");
@@ -111,6 +116,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertEquals(1, countFiles(new File(filesDirectory, "emoji-library/images")));
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addedEmojiCanBeNotedAndDeletedWithoutAffectingOthers）。
     @Test
     public void addedEmojiCanBeNotedAndDeletedWithoutAffectingOthers() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("delete-item-files");
@@ -142,6 +148,7 @@ public class LocalEmojiCatalogRepositoryTest {
                 legacy, "image/png").getItem().getName());
     }
 
+// 方法作用：处理 nonDefaultPackSupportsCreateRenameImportAndDelete 对应的输入并返回或更新相关结果（nonDefaultPackSupportsCreateRenameImportAndDelete）。
     @Test
     public void nonDefaultPackSupportsCreateRenameImportAndDelete() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("pack-files");
@@ -166,6 +173,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertEquals(1, countItems(repository.loadCatalog()));
     }
 
+// 方法作用：处理 batchCreatedPacksCanBeSharedAndUnlinkedAcrossGalleries 对应的输入并返回或更新相关结果（batchCreatedPacksCanBeSharedAndUnlinkedAcrossGalleries）。
     @Test
     public void batchCreatedPacksCanBeSharedAndUnlinkedAcrossGalleries() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("shared-pack-files");
@@ -199,6 +207,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertEquals(3, unlinked.getPacks().size());
     }
 
+// 方法作用：处理 batchUnlinkRemovesSelectedPackReferencesInOneCatalogWrite 对应的输入并返回或更新相关结果（batchUnlinkRemovesSelectedPackReferencesInOneCatalogWrite）。
     @Test
     public void batchUnlinkRemovesSelectedPackReferencesInOneCatalogWrite() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("batch-unlink-files");
@@ -222,6 +231,7 @@ public class LocalEmojiCatalogRepositoryTest {
                 LocalEmojiCatalogRepository.DEFAULT_GALLERY_ID).size());
     }
 
+// 方法作用：处理 batchDeleteRemovesSelectedItemsOnlyFromTheSelectedPack 对应的输入并返回或更新相关结果（batchDeleteRemovesSelectedItemsOnlyFromTheSelectedPack）。
     @Test
     public void batchDeleteRemovesSelectedItemsOnlyFromTheSelectedPack() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("batch-delete-items-files");
@@ -257,6 +267,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertEquals(2, countItems(repository.loadCatalog()));
     }
 
+// 方法作用：处理 deletingPackDoesNotDeleteOtherPackCopyOrSourceFile 对应的输入并返回或更新相关结果（deletingPackDoesNotDeleteOtherPackCopyOrSourceFile）。
     @Test
     public void deletingPackDoesNotDeleteOtherPackCopyOrSourceFile() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("delete-pack-isolation-files");
@@ -283,6 +294,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertTrue(repository.loadCatalog().getPack(secondPack.getId()) != null);
     }
 
+// 方法作用：处理 sameContentCanBelongToDifferentIndependentPacks 对应的输入并返回或更新相关结果（sameContentCanBelongToDifferentIndependentPacks）。
     @Test
     public void sameContentCanBelongToDifferentIndependentPacks() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("pack-scoped-duplicate-files");
@@ -307,6 +319,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertEquals(2, countFiles(new File(filesDirectory, "emoji-library/images")));
     }
 
+// 方法作用：处理 deletingLastEmojiIsRejectedWithoutChangingCatalog 对应的输入并返回或更新相关结果（deletingLastEmojiIsRejectedWithoutChangingCatalog）。
     @Test
     public void deletingLastEmojiIsRejectedWithoutChangingCatalog() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("last-item-files");
@@ -326,6 +339,7 @@ public class LocalEmojiCatalogRepositoryTest {
         assertEquals(1, countItems(repository.loadCatalog()));
     }
 
+// 方法作用：处理 missingManagedImageIsReported 对应的输入并返回或更新相关结果（missingManagedImageIsReported）。
     @Test
     public void missingManagedImageIsReported() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("missing-files");
@@ -344,6 +358,7 @@ public class LocalEmojiCatalogRepositoryTest {
         }
     }
 
+// 方法作用：处理 catalogActivationFailureDoesNotLeaveManagedImage 对应的输入并返回或更新相关结果（catalogActivationFailureDoesNotLeaveManagedImage）。
     @Test
     public void catalogActivationFailureDoesNotLeaveManagedImage() throws Exception {
         File libraryDirectory = temporaryFolder.newFolder("failed-library");
@@ -363,6 +378,7 @@ public class LocalEmojiCatalogRepositoryTest {
         }
     }
 
+// 方法作用：处理 unsupportedImageMimeIsRejectedWithoutCreatingCatalog 对应的输入并返回或更新相关结果（unsupportedImageMimeIsRejectedWithoutCreatingCatalog）。
     @Test
     public void unsupportedImageMimeIsRejectedWithoutCreatingCatalog() throws Exception {
         File filesDirectory = temporaryFolder.newFolder("unsupported-files");
@@ -378,12 +394,14 @@ public class LocalEmojiCatalogRepositoryTest {
         }
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createFile）。
     private File createFile(String name, byte[] contents) throws Exception {
         File file = temporaryFolder.newFile(name);
         Files.write(file.toPath(), contents);
         return file;
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findPack）。
     private static EmojiCatalog.Pack findPack(EmojiCatalog catalog, String packId) {
         for (EmojiCatalog.Pack pack : catalog.getPacks()) {
             if (packId.equals(pack.getId())) {
@@ -393,6 +411,7 @@ public class LocalEmojiCatalogRepositoryTest {
         throw new AssertionError("Pack not found: " + packId);
     }
 
+// 方法作用：统计当前集合中的元素数量（countItems）。
     private static int countItems(EmojiCatalog catalog) {
         int count = 0;
         for (EmojiCatalog.Pack pack : catalog.getPacks()) {
@@ -401,6 +420,7 @@ public class LocalEmojiCatalogRepositoryTest {
         return count;
     }
 
+// 方法作用：统计当前集合中的元素数量（countFiles）。
     private static int countFiles(File directory) {
         File[] children = directory.listFiles();
         if (children == null) {

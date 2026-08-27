@@ -23,7 +23,8 @@ import java.util.NavigableMap;
 import java.util.Set;
 import java.util.TreeMap;
 
-/** Loads the complete lexicon and returns candidates for a pinyin prefix. */
+/** 加载完整词库，并按拼音前缀返回候选词。 */
+// 类作用：定义 PinyinDictionary，承载所在模块的主要职责。
 final class PinyinDictionary {
     private static final String ASSET_NAME = "lexicon_chat.json";
     private static final String COMMON_HANZI_ASSET_NAME = "common_hanzi.txt";
@@ -38,6 +39,7 @@ final class PinyinDictionary {
     private final Map<String, Integer> usageCounts;
     private final Map<String, List<String>> queryCache =
             new LinkedHashMap<String, List<String>>(QUERY_CACHE_SIZE, 0.75f, true) {
+// 方法作用：删除目标数据并清理相关引用或临时文件（removeEldestEntry）。
                 @Override
                 protected boolean removeEldestEntry(Map.Entry<String, List<String>> eldest) {
                     return size() > QUERY_CACHE_SIZE;
@@ -55,6 +57,7 @@ final class PinyinDictionary {
         this.usageCounts = new HashMap<>(usageCounts);
     }
 
+// 方法作用：从文件、网络或内存加载数据（load）。
     static PinyinDictionary load(Context context) {
         PinyinDictionary cached = cachedDictionary;
         if (cached != null) {
@@ -68,6 +71,7 @@ final class PinyinDictionary {
         }
     }
 
+// 方法作用：从文件、网络或内存加载数据（loadUncached）。
     private static PinyinDictionary loadUncached(Context context) {
         Map<String, List<Entry>> index = new TreeMap<>();
         Set<String> syllableIndex = new HashSet<>();
@@ -97,6 +101,7 @@ final class PinyinDictionary {
                 loadUsageCounts(preferences));
     }
 
+// 方法作用：从输入源读取并转换数据（readRecord）。
     private static void readRecord(
             JsonReader json,
             Map<String, List<Entry>> index,
@@ -143,6 +148,7 @@ final class PinyinDictionary {
         }
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addSingleCharacterEntries）。
     private static void addSingleCharacterEntries(
             Map<String, List<Entry>> index,
             String token,
@@ -172,6 +178,7 @@ final class PinyinDictionary {
         }
     }
 
+// 方法作用：向界面或业务集合中添加新的元素（addEntry）。
     private static void addEntry(
             Map<String, List<Entry>> index,
             String key,
@@ -188,6 +195,7 @@ final class PinyinDictionary {
         entries.add(new Entry(text, frequency));
     }
 
+// 方法作用：处理 commonCharacterCount 对应的输入并返回或更新相关结果（commonCharacterCount）。
     private static int commonCharacterCount(String text, Set<String> commonCharacters) {
         int count = 0;
         for (int offset = 0; offset < text.length();) {
@@ -201,12 +209,14 @@ final class PinyinDictionary {
         return count;
     }
 
+// 方法作用：判断当前对象是否满足指定条件（isHan）。
     private static boolean isHan(int codePoint) {
         return (codePoint >= 0x3400 && codePoint <= 0x4dbf)
                 || (codePoint >= 0x4e00 && codePoint <= 0x9fff)
                 || (codePoint >= 0x20000 && codePoint <= 0x323af);
     }
 
+// 方法作用：从输入源读取并转换数据（readEncodings）。
     private static List<List<String>> readEncodings(JsonReader json)
             throws java.io.IOException {
         List<List<String>> encodings = new ArrayList<>();
@@ -224,6 +234,7 @@ final class PinyinDictionary {
         return encodings;
     }
 
+// 方法作用：从文件、网络或内存加载数据（loadCommonCharacters）。
     private static Set<String> loadCommonCharacters(Context context) {
         Set<String> characters = new HashSet<>();
         try (InputStream input = context.getAssets().open(COMMON_HANZI_ASSET_NAME);
@@ -242,6 +253,7 @@ final class PinyinDictionary {
         return characters;
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（query）。
     synchronized List<String> query(String pinyin, int limit) {
         String normalized = normalize(pinyin);
         if (normalized.isEmpty() || limit <= 0) {
@@ -278,6 +290,7 @@ final class PinyinDictionary {
         return entriesByPinyin.isEmpty();
     }
 
+// 方法作用：处理 recordSelection 对应的输入并返回或更新相关结果（recordSelection）。
     synchronized void recordSelection(String candidate) {
         if (candidate == null || candidate.isEmpty()) {
             return;
@@ -292,6 +305,7 @@ final class PinyinDictionary {
         }
     }
 
+// 方法作用：向当前拼音缓冲区追加输入并刷新候选（appendPrefixEntries）。
     private void appendPrefixEntries(Set<String> candidates, String prefix, int limit) {
         List<Entry> best = new ArrayList<>(limit);
         for (Map.Entry<String, List<Entry>> entry
@@ -304,6 +318,7 @@ final class PinyinDictionary {
         appendRankedTexts(candidates, best, limit);
     }
 
+// 方法作用：向当前拼音缓冲区追加输入并刷新候选（appendEntries）。
     private void appendEntries(Set<String> candidates, List<Entry> entries, int limit) {
         if (entries == null) {
             return;
@@ -313,6 +328,7 @@ final class PinyinDictionary {
         appendRankedTexts(candidates, best, limit);
     }
 
+// 方法作用：向当前拼音缓冲区追加输入并刷新候选（appendRankedTexts）。
     private void appendRankedTexts(Set<String> candidates, List<Entry> entries, int limit) {
         for (Entry entry : entries) {
             candidates.add(entry.text);
@@ -322,6 +338,7 @@ final class PinyinDictionary {
         }
     }
 
+// 方法作用：递归遍历授权目录并收集图片 URI（collectBest）。
     private void collectBest(
             List<Entry> best,
             Set<String> existingCandidates,
@@ -335,6 +352,7 @@ final class PinyinDictionary {
         }
     }
 
+// 方法作用：处理 insertBest 对应的输入并返回或更新相关结果（insertBest）。
     private void insertBest(List<Entry> best, Entry candidate, int limit, boolean preferShorter) {
         for (int index = 0; index < best.size(); index++) {
             Entry existing = best.get(index);
@@ -359,6 +377,7 @@ final class PinyinDictionary {
         }
     }
 
+// 方法作用：根据输入参数计算或比较结果（compareEntries）。
     private int compareEntries(Entry left, Entry right, boolean preferShorter) {
         int scoreOrder = Long.compare(score(right), score(left));
         if (scoreOrder != 0) {
@@ -373,21 +392,25 @@ final class PinyinDictionary {
         return left.text.compareTo(right.text);
     }
 
+// 方法作用：根据输入参数计算或比较结果（compareStaticEntries）。
     private static int compareStaticEntries(Entry left, Entry right) {
         int weightOrder = Long.compare(right.weight, left.weight);
         return weightOrder != 0 ? weightOrder : left.text.compareTo(right.text);
     }
 
+// 方法作用：处理 score 对应的输入并返回或更新相关结果（score）。
     private long score(Entry entry) {
         return entry.weight
                 + (long) usageCount(entry.text) * 10_000_000L;
     }
 
+// 方法作用：处理 usageCount 对应的输入并返回或更新相关结果（usageCount）。
     private int usageCount(String candidate) {
         Integer count = usageCounts.get(candidate);
         return count == null ? 0 : count;
     }
 
+// 方法作用：从文件、网络或内存加载数据（loadUsageCounts）。
     private static Map<String, Integer> loadUsageCounts(SharedPreferences preferences) {
         Map<String, Integer> counts = new HashMap<>();
         for (Map.Entry<String, ?> entry : preferences.getAll().entrySet()) {
@@ -400,6 +423,7 @@ final class PinyinDictionary {
         return counts;
     }
 
+// 方法作用：处理 composeSingleCharacters 对应的输入并返回或更新相关结果（composeSingleCharacters）。
     private String composeSingleCharacters(List<String> split) {
         StringBuilder result = new StringBuilder();
         for (String syllable : split) {
@@ -416,6 +440,7 @@ final class PinyinDictionary {
         return result.toString();
     }
 
+// 方法作用：取得集合中第一个可用元素的标识（firstSingleCharacter）。
     private static String firstSingleCharacter(List<Entry> entries) {
         for (Entry entry : entries) {
             if (entry.text.codePointCount(0, entry.text.length()) == 1) {
@@ -425,6 +450,7 @@ final class PinyinDictionary {
         return null;
     }
 
+// 方法作用：处理 splitSyllables 对应的输入并返回或更新相关结果（splitSyllables）。
     static List<String> splitSyllables(String pinyin, Set<String> knownSyllables) {
         String normalized = normalize(pinyin);
         if (normalized.isEmpty() || knownSyllables == null || knownSyllables.isEmpty()) {
@@ -435,6 +461,7 @@ final class PinyinDictionary {
             paths.add(null);
         }
         paths.set(0, Collections.emptyList());
+        // 动态规划保留到达每个位置所需音节数最少的路径，解决连续拼音歧义。
         for (int start = 0; start < normalized.length(); start++) {
             List<String> path = paths.get(start);
             if (path == null) {
@@ -457,10 +484,12 @@ final class PinyinDictionary {
         return result == null ? Collections.emptyList() : result;
     }
 
+// 方法作用：清理并规范化输入值（normalize）。
     static String normalize(String value) {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
+// 方法作用：处理 joinSyllables 对应的输入并返回或更新相关结果（joinSyllables）。
     private static String joinSyllables(List<String> syllables) {
         if (syllables == null) {
             return "";
@@ -474,6 +503,7 @@ final class PinyinDictionary {
         return result.toString();
     }
 
+// 类作用：定义 Entry，承载所在模块的主要职责。
     static final class Entry {
         private final String text;
         private final long weight;
