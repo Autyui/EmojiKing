@@ -49,7 +49,10 @@ public class EmojiInputMethodService extends InputMethodService {
     private String selectedItemId;
     private boolean textMode = true;
     private boolean englishMode;
+    private boolean englishUppercase;
+    private int textPage;
     private final StringBuilder pinyinBuffer = new StringBuilder();
+    private HorizontalScrollView candidateScroll;
     private LinearLayout candidateStrip;
     private TextView composingLabel;
     private PinyinDictionary pinyinDictionary;
@@ -79,6 +82,8 @@ public class EmojiInputMethodService extends InputMethodService {
             }
             textMode = !textMode;
             englishMode = false;
+            englishUppercase = false;
+            textPage = 0;
             pinyinBuffer.setLength(0);
             refreshInputMode();
         });
@@ -196,23 +201,26 @@ public class EmojiInputMethodService extends InputMethodService {
     }
 
     private View createTextPanel() {
+        if (textPage != 0) {
+            return createSpecialPanel();
+        }
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
 
-        HorizontalScrollView candidateScroll = new HorizontalScrollView(this);
+        candidateScroll = new HorizontalScrollView(this);
         candidateScroll.setHorizontalScrollBarEnabled(false);
         candidateStrip = new LinearLayout(this);
         candidateStrip.setGravity(Gravity.CENTER_VERTICAL);
         candidateScroll.addView(candidateStrip, matchWrap());
         panel.addView(candidateScroll, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(46)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(24)));
 
         composingLabel = label("", 12);
         composingLabel.setTextColor(secondaryTextColor());
         composingLabel.setGravity(Gravity.CENTER_VERTICAL);
         composingLabel.setPadding(dp(10), 0, dp(10), 0);
         panel.addView(composingLabel, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(22)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(12)));
 
         addKeyRow(panel, "QWERTYUIOP", 0.0f, false);
         addKeyRow(panel, "ASDFGHJKL", 0.05f, false);
@@ -220,15 +228,19 @@ public class EmojiInputMethodService extends InputMethodService {
 
         LinearLayout controls = new LinearLayout(this);
         controls.setGravity(Gravity.CENTER);
-        addControlKey(controls, "符", "输入符号", view -> commitText("，"), 0.9f);
-        addControlKey(controls, "123", "切换数字输入", view -> commitText("123"), 1.0f);
+        addControlKey(controls, "符", "打开符号面板", view -> openTextPage(1), 0.9f);
+        addControlKey(controls, "123", "打开数字键盘", view -> openTextPage(2), 1.0f);
         addControlKey(controls, ",", "输入逗号", view -> commitText("，"), 0.8f);
         addControlKey(controls, "空格", "选择首个候选或输入空格", view -> chooseFirstCandidate(), 2.5f);
         addControlKey(controls, "。", "输入句号", view -> commitText("。"), 0.8f);
+        if (englishMode) {
+            addControlKey(controls, englishUppercase ? "小写" : "大写",
+                    "切换英文大小写", view -> toggleCase(), 1.0f);
+        }
         addControlKey(controls, "中英", "切换中文或英文输入", view -> toggleLanguage(), 1.0f);
         addControlKey(controls, "回车", "换行", view -> sendEnter(), 1.0f);
         panel.addView(controls, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(54)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
         renderCandidates();
         return panel;
     }
@@ -241,8 +253,10 @@ public class EmojiInputMethodService extends InputMethodService {
             row.addView(inset, new LinearLayout.LayoutParams(0, 1, insetWeight));
         }
         for (int index = 0; index < keys.length(); index++) {
-            String key = String.valueOf(keys.charAt(index));
-            addControlKey(row, key, "输入字母" + key, view -> appendPinyin(key), 1f);
+            String baseKey = String.valueOf(keys.charAt(index));
+            String key = englishMode && !englishUppercase
+                    ? baseKey.toLowerCase(java.util.Locale.ROOT) : baseKey;
+            addControlKey(row, key, "输入字母" + key, view -> appendPinyin(baseKey), 1f);
         }
         if (withBackspace) {
             addControlKey(row, "删", "删除拼音或前一个字符", view -> deleteLast(), 1f);
@@ -252,7 +266,54 @@ public class EmojiInputMethodService extends InputMethodService {
             row.addView(inset, new LinearLayout.LayoutParams(0, 1, insetWeight));
         }
         panel.addView(row, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, dp(52)));
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+    }
+
+    private View createSpecialPanel() {
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout title = new LinearLayout(this);
+        title.setGravity(Gravity.CENTER_VERTICAL);
+        addControlKey(title, "返回", "返回文字键盘", view -> openTextPage(0), 1f);
+        TextView label = label(textPage == 1 ? "符号" : "数字", 14);
+        title.addView(label, new LinearLayout.LayoutParams(0, dp(42), 3f));
+        panel.addView(title, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(44)));
+        if (textPage == 1) {
+            addSpecialRows(panel, new String[]{
+                    "！@#$%^&*()", "+-=_/\\|~`", "（）【】{}<>", "，。！？：；‘’“”", "、·…—"
+            }, 10);
+        } else {
+            addSpecialRows(panel, new String[]{"123", "456", "789", "0.,"}, 3);
+        }
+        return panel;
+    }
+
+    private void addSpecialRows(LinearLayout panel, String[] rows, int columns) {
+        for (String values : rows) {
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER);
+            for (int index = 0; index < values.length(); index++) {
+                String value = String.valueOf(values.charAt(index));
+                addControlKey(row, value, "输入" + value, view -> commitText(value), 1f);
+            }
+            panel.addView(row, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+        }
+        if (textPage == 2) {
+            LinearLayout row = new LinearLayout(this);
+            row.setGravity(Gravity.CENTER);
+            addControlKey(row, "删", "删除一个字符", view -> deleteLast(), 1f);
+            addControlKey(row, "回车", "换行", view -> sendEnter(), 1f);
+            panel.addView(row, new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+        }
+    }
+
+    private void openTextPage(int page) {
+        commitPinyin();
+        textPage = page;
+        refreshInputMode();
     }
 
     private void addControlKey(
@@ -272,7 +333,8 @@ public class EmojiInputMethodService extends InputMethodService {
 
     private void appendPinyin(String key) {
         if (englishMode) {
-            commitText(key);
+            commitText(englishUppercase ? key.toUpperCase(java.util.Locale.ROOT)
+                    : key.toLowerCase(java.util.Locale.ROOT));
             return;
         }
         pinyinBuffer.append(key.toLowerCase(java.util.Locale.ROOT));
@@ -282,9 +344,13 @@ public class EmojiInputMethodService extends InputMethodService {
     private void toggleLanguage() {
         commitPinyin();
         englishMode = !englishMode;
-        if (composingLabel != null) {
-            composingLabel.setText(englishMode ? "英文" : "中文");
-        }
+        englishUppercase = false;
+        refreshInputMode();
+    }
+
+    private void toggleCase() {
+        englishUppercase = !englishUppercase;
+        refreshInputMode();
     }
 
     private void deleteLast() {
@@ -349,6 +415,9 @@ public class EmojiInputMethodService extends InputMethodService {
         InputConnection connection = getCurrentInputConnection();
         if (connection != null) {
             connection.commitText(candidate, 1);
+        }
+        if (pinyinDictionary != null) {
+            pinyinDictionary.recordSelection(candidate);
         }
         pinyinBuffer.setLength(0);
         renderCandidates();
