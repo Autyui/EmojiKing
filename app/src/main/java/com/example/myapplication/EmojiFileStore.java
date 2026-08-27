@@ -153,6 +153,26 @@ public final class EmojiFileStore {
         return new BatchImportResult(imported, duplicate, failures, lastImported);
     }
 
+    public static synchronized LocalEmojiCatalogRepository.ImportResult importFile(
+            Context context,
+            File source,
+            String displayName,
+            String packId) throws IOException {
+        if (source == null || !source.isFile() || source.length() <= 0) {
+            throw new IOException("待导入图片不存在");
+        }
+        if (source.length() > MAX_IMAGE_BYTES) {
+            throw new IOException("图片超过 20 MiB 限制");
+        }
+        ensureCatalog(context);
+        ImageInfo info = inspectImage(source);
+        return repository(context).importEmoji(
+                packId,
+                source,
+                normalizeDisplayName(displayName, info.mimeType),
+                info.mimeType);
+    }
+
     public static List<Uri> listImageDocuments(Context context, Uri treeUri) throws IOException {
         if (treeUri == null) {
             throw new IOException("The selected directory authorization is invalid");
