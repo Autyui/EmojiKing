@@ -12,7 +12,9 @@ import java.util.Map;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+// 类作用：定义 PinyinDictionaryTest，承载所在模块的主要职责。
 public class PinyinDictionaryTest {
+// 方法作用：处理 splitsContinuousPinyinIntoSyllables 对应的输入并返回或更新相关结果（splitsContinuousPinyinIntoSyllables）。
     @Test
     public void splitsContinuousPinyinIntoSyllables() {
         assertEquals(
@@ -21,6 +23,7 @@ public class PinyinDictionaryTest {
                         "nihao", new HashSet<>(Arrays.asList("ni", "hao", "ma"))));
     }
 
+// 方法作用：处理 prefersTheFewestSyllablesForAmbiguousInput 对应的输入并返回或更新相关结果（prefersTheFewestSyllablesForAmbiguousInput）。
     @Test
     public void prefersTheFewestSyllablesForAmbiguousInput() {
         assertEquals(
@@ -29,12 +32,14 @@ public class PinyinDictionaryTest {
                         "xian", new HashSet<>(Arrays.asList("xi", "an", "xian"))));
     }
 
+// 方法作用：处理 incompletePinyinDoesNotProduceAFalseSegmentation 对应的输入并返回或更新相关结果（incompletePinyinDoesNotProduceAFalseSegmentation）。
     @Test
     public void incompletePinyinDoesNotProduceAFalseSegmentation() {
         assertTrue(PinyinDictionary.splitSyllables(
                 "niha", new HashSet<>(Arrays.asList("ni", "hao"))).isEmpty());
     }
 
+// 方法作用：处理 prefixQueryKeepsOnlyTheHighestRankedCandidates 对应的输入并返回或更新相关结果（prefixQueryKeepsOnlyTheHighestRankedCandidates）。
     @Test
     public void prefixQueryKeepsOnlyTheHighestRankedCandidates() {
         Map<String, List<PinyinDictionary.Entry>> entries = new HashMap<>();
@@ -46,6 +51,7 @@ public class PinyinDictionaryTest {
         assertEquals(Arrays.asList("最高", "次高"), dictionary.query("n", 2));
     }
 
+// 方法作用：处理 learnedCandidateMovesAheadAfterCachedQuery 对应的输入并返回或更新相关结果（learnedCandidateMovesAheadAfterCachedQuery）。
     @Test
     public void learnedCandidateMovesAheadAfterCachedQuery() {
         Map<String, List<PinyinDictionary.Entry>> entries = new HashMap<>();
@@ -59,6 +65,7 @@ public class PinyinDictionaryTest {
         assertEquals(Arrays.asList("学习", "常用"), dictionary.query("ni", 2));
     }
 
+// 方法作用：处理 completeSyllableDoesNotMergeSeparateLetterEntries 对应的输入并返回或更新相关结果（completeSyllableDoesNotMergeSeparateLetterEntries）。
     @Test
     public void completeSyllableDoesNotMergeSeparateLetterEntries() {
         Map<String, List<PinyinDictionary.Entry>> entries = new HashMap<>();
@@ -70,6 +77,7 @@ public class PinyinDictionaryTest {
         assertEquals(Collections.singletonList("如"), dictionary.query("ru", 15));
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（queryCanReturnFifteenCandidates）。
     @Test
     public void queryCanReturnFifteenCandidates() {
         Map<String, List<PinyinDictionary.Entry>> entries = new HashMap<>();
@@ -82,6 +90,7 @@ public class PinyinDictionaryTest {
         assertEquals(15, dictionary(entries).query("houxuan", 15).size());
     }
 
+// 方法作用：处理 dictionary 对应的输入并返回或更新相关结果（dictionary）。
     private static PinyinDictionary dictionary(
             Map<String, List<PinyinDictionary.Entry>> entries) {
         return new PinyinDictionary(
@@ -91,6 +100,7 @@ public class PinyinDictionaryTest {
                 Collections.emptyMap());
     }
 
+// 方法作用：处理 entry 对应的输入并返回或更新相关结果（entry）。
     private static PinyinDictionary.Entry entry(String text, long weight) {
         return new PinyinDictionary.Entry(text, weight);
     }

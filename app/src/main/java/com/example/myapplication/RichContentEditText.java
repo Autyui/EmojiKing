@@ -19,28 +19,35 @@ import androidx.core.view.inputmethod.InputContentInfoCompat;
 import java.io.IOException;
 import java.io.InputStream;
 
-/** Test receiver for the standard rich-content input protocol. */
+/** 按 Android 标准富内容输入协议接收图片的测试控件。 */
+// 类作用：定义 RichContentEditText，承载所在模块的主要职责。
 public final class RichContentEditText extends AppCompatEditText {
     private static final String[] ACCEPTED_MIME_TYPES = {"image/*"};
     private static final int MAX_PREVIEW_SIZE = 1024;
 
+// 类作用：定义 Listener，承载所在模块的主要职责。
     public interface Listener {
+// 方法作用：处理 onImageReceived 对应的输入并返回或更新相关结果（onImageReceived）。
         void onImageReceived(@NonNull Bitmap bitmap, @NonNull String mimeType);
 
+// 方法作用：处理 onImageRejected 对应的输入并返回或更新相关结果（onImageRejected）。
         void onImageRejected(@NonNull String reason);
     }
 
     @Nullable
     private Listener listener;
 
+// 方法作用：初始化 RichContentEditText 对象并建立其运行所需状态。
     public RichContentEditText(@NonNull Context context) {
         super(context);
     }
 
+// 方法作用：初始化 RichContentEditText 对象并建立其运行所需状态。
     public RichContentEditText(@NonNull Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
     }
 
+// 方法作用：初始化 RichContentEditText 对象并建立其运行所需状态。
     public RichContentEditText(
             @NonNull Context context,
             @Nullable AttributeSet attrs,
@@ -48,10 +55,12 @@ public final class RichContentEditText extends AppCompatEditText {
         super(context, attrs, defStyleAttr);
     }
 
+// 方法作用：更新对象状态或注册回调（setListener）。
     public void setListener(@Nullable Listener listener) {
         this.listener = listener;
     }
 
+// 方法作用：处理 onCreateInputConnection 对应的输入并返回或更新相关结果（onCreateInputConnection）。
     @Nullable
     @Override
     public InputConnection onCreateInputConnection(@NonNull EditorInfo outAttrs) {
@@ -66,6 +75,7 @@ public final class RichContentEditText extends AppCompatEditText {
                 this::onCommitContent);
     }
 
+// 方法作用：处理 onCommitContent 对应的输入并返回或更新相关结果（onCommitContent）。
     private boolean onCommitContent(
             @NonNull InputContentInfoCompat content,
             int flags,
@@ -106,6 +116,7 @@ public final class RichContentEditText extends AppCompatEditText {
         }
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findImageMimeType）。
     @Nullable
     private String findImageMimeType(@NonNull ClipDescription description) {
         for (int index = 0; index < description.getMimeTypeCount(); index++) {
@@ -117,6 +128,7 @@ public final class RichContentEditText extends AppCompatEditText {
         return null;
     }
 
+// 方法作用：解码输入内容并生成可用对象（decodePreview）。
     @Nullable
     private Bitmap decodePreview(@NonNull InputContentInfoCompat content) throws IOException {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
@@ -147,6 +159,7 @@ public final class RichContentEditText extends AppCompatEditText {
         }
     }
 
+// 方法作用：处理 reject 对应的输入并返回或更新相关结果（reject）。
     private void reject(@NonNull String reason) {
         if (listener != null) {
             listener.onImageRejected(reason);

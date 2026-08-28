@@ -14,8 +14,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+// 类作用：定义 ImageShareSenderInstrumentedTest，承载所在模块的主要职责。
 @RunWith(AndroidJUnit4.class)
 public class ImageShareSenderInstrumentedTest {
+// 方法作用：把当前选中的内容发送到目标输入框或分享面板（sendIntentContainsStreamClipDataAndReadGrant）。
     @Test
     public void sendIntentContainsStreamClipDataAndReadGrant() {
         Context context = ApplicationProvider.getApplicationContext();
@@ -32,6 +34,7 @@ public class ImageShareSenderInstrumentedTest {
         assertTrue((intent.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) != 0);
     }
 
+// 方法作用：根据候选条件选择并返回目标项（chooserCanStartOutsideAnActivity）。
     @Test
     public void chooserCanStartOutsideAnActivity() {
         Context context = ApplicationProvider.getApplicationContext();
@@ -46,6 +49,7 @@ public class ImageShareSenderInstrumentedTest {
         assertTrue((chooser.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK) != 0);
     }
 
+// 方法作用：处理 targetIntentRestrictsShareToCurrentEditorPackage 对应的输入并返回或更新相关结果（targetIntentRestrictsShareToCurrentEditorPackage）。
     @Test
     public void targetIntentRestrictsShareToCurrentEditorPackage() {
         Context context = ApplicationProvider.getApplicationContext();

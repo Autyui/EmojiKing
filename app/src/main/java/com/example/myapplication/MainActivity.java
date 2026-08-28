@@ -49,6 +49,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+// 类作用：定义 MainActivity，承载所在模块的主要职责。
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_PICK_IMAGES = 1001;
     private static final int REQUEST_PICK_DIRECTORY = 1002;
@@ -82,6 +83,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean importBusy;
     private boolean openDirectoryAfterPermission;
 
+// 方法作用：按生命周期创建并初始化界面或服务状态（onCreate）。
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -90,6 +92,7 @@ public class MainActivity extends AppCompatActivity {
         reloadCatalog(null, null);
     }
 
+// 方法作用：构建并更新用户界面内容（buildMainLayout）。
     private View buildMainLayout() {
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.HORIZONTAL);
@@ -211,6 +214,7 @@ public class MainActivity extends AppCompatActivity {
         return page;
     }
 
+// 方法作用：按生命周期释放线程、监听器和其他资源（onDestroy）。
     @Override
     protected void onDestroy() {
         importExecutor.shutdownNow();
@@ -220,6 +224,7 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
     }
 
+// 方法作用：在页面恢复时重新加载需要同步的状态（onResume）。
     @Override
     protected void onResume() {
         super.onResume();
@@ -228,6 +233,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（reloadCatalog）。
     private void reloadCatalog(String preferredGalleryId, String preferredPackId) {
         clearBatchDeleteState();
         clearTapTracking();
@@ -254,6 +260,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（clearTapTracking）。
     private void clearTapTracking() {
         lastGalleryTapId = null;
         lastGalleryTapAt = 0L;
@@ -261,6 +268,7 @@ public class MainActivity extends AppCompatActivity {
         lastPackTapAt = 0L;
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectGallery）。
     private void selectGallery(String galleryId, String preferredPackId) {
         if (catalog == null || catalog.getGalleries().isEmpty()) {
             return;
@@ -282,6 +290,7 @@ public class MainActivity extends AppCompatActivity {
         renderGrid();
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectPack）。
     private void selectPack(String packId) {
         if (catalog == null || !catalog.galleryContainsPack(selectedGalleryId, packId)) {
             return;
@@ -292,6 +301,7 @@ public class MainActivity extends AppCompatActivity {
         renderGrid();
     }
 
+// 方法作用：构建并更新用户界面内容（renderGalleries）。
     private void renderGalleries() {
         galleryRail.removeAllViews();
         galleryControls.clear();
@@ -311,6 +321,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：构建并更新用户界面内容（renderPacks）。
     private void renderPacks() {
         packStrip.removeAllViews();
         packControls.clear();
@@ -339,6 +350,7 @@ public class MainActivity extends AppCompatActivity {
         packStrip.addView(addPack, new LinearLayout.LayoutParams(dp(60), dp(60)));
     }
 
+// 方法作用：构建并更新用户界面内容（renderGrid）。
     private void renderGrid() {
         EmojiCatalog.Pack pack = selectedPack();
         if (pack == null) {
@@ -364,6 +376,7 @@ public class MainActivity extends AppCompatActivity {
                 pack.getItems().size()));
     }
 
+// 方法作用：显示或打开对应的交互界面（showAddPackMenu）。
     private void showAddPackMenu() {
         if (catalog == null) {
             return;
@@ -381,6 +394,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showBatchCreatePackDialog）。
     private void showBatchCreatePackDialog() {
         EditText input = dialogInput("每行一个表情包名称", "常用\n收藏\n动图", true);
         new AlertDialog.Builder(this)
@@ -398,6 +412,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showGalleryTargetsDialog）。
     private void showGalleryTargetsDialog(List<String> packNames) {
         List<EmojiCatalog.Gallery> galleries = catalog.getGalleries();
         String[] labels = new String[galleries.size()];
@@ -433,6 +448,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showLinkExistingPacksDialog）。
     private void showLinkExistingPacksDialog() {
         List<EmojiCatalog.Pack> candidates = new ArrayList<>();
         for (EmojiCatalog.Pack pack : catalog.getPacks()) {
@@ -474,6 +490,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showCreateGalleryDialog）。
     private void showCreateGalleryDialog() {
         showTextDialog("新建图库", "图库名称", "", value -> {
             try {
@@ -485,6 +502,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：执行该操作的业务流程并处理结果（handleGalleryTap）。
     private void handleGalleryTap(EmojiCatalog.Gallery gallery) {
         if (batchDeleteMode) {
             exitBatchDeleteMode();
@@ -496,6 +514,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：执行该操作的业务流程并处理结果（handlePackTap）。
     private void handlePackTap(EmojiCatalog.Pack pack) {
         if (batchDeleteMode) {
             exitBatchDeleteMode();
@@ -507,7 +526,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /** Keeps double-tap detection stable across the selection row's redraws. */
+    /** 在选择栏重绘后仍保持双击判定的时间和对象一致。 */
+// 方法作用：判断当前对象是否满足指定条件（isDoubleTap）。
     private boolean isDoubleTap(String itemId, boolean gallery) {
         long now = SystemClock.uptimeMillis();
         String previousId = gallery ? lastGalleryTapId : lastPackTapId;
@@ -525,6 +545,7 @@ public class MainActivity extends AppCompatActivity {
         return matched;
     }
 
+// 方法作用：显示或打开对应的交互界面（showGalleryMenu）。
     private void showGalleryMenu(EmojiCatalog.Gallery gallery) {
         new AlertDialog.Builder(this)
                 .setTitle(gallery.getName())
@@ -545,6 +566,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：处理 confirmDeleteGallery 对应的输入并返回或更新相关结果（confirmDeleteGallery）。
     private void confirmDeleteGallery(EmojiCatalog.Gallery gallery) {
         new AlertDialog.Builder(this)
                 .setTitle("删除图库")
@@ -561,6 +583,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showPackMenu）。
     private void showPackMenu(EmojiCatalog.Pack pack) {
         new AlertDialog.Builder(this)
                 .setTitle(pack.getName())
@@ -577,6 +600,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：处理 enterBatchDeleteMode 对应的输入并返回或更新相关结果（enterBatchDeleteMode）。
     private void enterBatchDeleteMode(EmojiCatalog.Pack pack) {
         if (pack.getItems().isEmpty()) {
             toast("当前类没有可删除的表情包");
@@ -588,6 +612,7 @@ public class MainActivity extends AppCompatActivity {
         renderGrid();
     }
 
+// 方法作用：切换键盘模式并刷新相关界面（toggleBatchDeleteItem）。
     private void toggleBatchDeleteItem(EmojiCatalog.Item item) {
         if (!selectedItemIds.add(item.getId())) {
             selectedItemIds.remove(item.getId());
@@ -596,6 +621,7 @@ public class MainActivity extends AppCompatActivity {
         updateBatchDeleteBar();
     }
 
+// 方法作用：重新计算并刷新当前显示或缓存状态（updateBatchDeleteBar）。
     private void updateBatchDeleteBar() {
         if (batchDeleteBar == null) {
             return;
@@ -606,6 +632,7 @@ public class MainActivity extends AppCompatActivity {
         batchDeleteButton.setEnabled(!selectedItemIds.isEmpty() && !importBusy);
     }
 
+// 方法作用：处理 exitBatchDeleteMode 对应的输入并返回或更新相关结果（exitBatchDeleteMode）。
     private void exitBatchDeleteMode() {
         if (!batchDeleteMode) {
             return;
@@ -616,6 +643,7 @@ public class MainActivity extends AppCompatActivity {
         renderGrid();
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（clearBatchDeleteState）。
     private void clearBatchDeleteState() {
         batchDeleteMode = false;
         batchDeletePackId = null;
@@ -626,6 +654,7 @@ public class MainActivity extends AppCompatActivity {
         updateBatchDeleteBar();
     }
 
+// 方法作用：处理 confirmBatchDeleteItems 对应的输入并返回或更新相关结果（confirmBatchDeleteItems）。
     private void confirmBatchDeleteItems() {
         if (selectedItemIds.isEmpty() || batchDeletePackId == null) {
             toast("请至少选择一个表情包");
@@ -649,6 +678,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showRenamePackDialog）。
     private void showRenamePackDialog(EmojiCatalog.Pack pack) {
         showTextDialog("重命名表情包", "表情包名称", pack.getName(), value -> {
             try {
@@ -660,6 +690,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：处理 confirmDeletePack 对应的输入并返回或更新相关结果（confirmDeletePack）。
     private void confirmDeletePack(EmojiCatalog.Pack pack) {
         new AlertDialog.Builder(this)
                 .setTitle("删除该类")
@@ -676,6 +707,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showItemActions）。
     private void showItemActions(EmojiCatalog.Item item) {
         new AlertDialog.Builder(this)
                 .setTitle(item.getName())
@@ -702,6 +734,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showItemDetails）。
     private void showItemDetails(EmojiCatalog.Item item) {
         try {
             LocalEmojiCatalogRepository.StoredEmoji stored = EmojiFileStore.getStoredEmoji(
@@ -750,6 +783,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：解码输入内容并生成可用对象（decodeDetailBitmap）。
     private static Bitmap decodeDetailBitmap(File file) {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
@@ -768,6 +802,7 @@ public class MainActivity extends AppCompatActivity {
         return BitmapFactory.decodeFile(file.getAbsolutePath(), options);
     }
 
+// 方法作用：处理 confirmDeleteItem 对应的输入并返回或更新相关结果（confirmDeleteItem）。
     private void confirmDeleteItem(EmojiCatalog.Item item) {
         new AlertDialog.Builder(this)
                 .setTitle("移除表情")
@@ -784,6 +819,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（openImagePicker）。
     private void openImagePicker() {
         if (selectedPack() == null) {
             toast("请先添加并选择一个表情包");
@@ -796,6 +832,7 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, REQUEST_PICK_IMAGES);
     }
 
+// 方法作用：显示或打开对应的交互界面（openKeyboardBackgroundPicker）。
     private void openKeyboardBackgroundPicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -803,6 +840,7 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, REQUEST_PICK_KEYBOARD_BACKGROUND);
     }
 
+// 方法作用：校验并持久化用户提供的数据（saveKeyboardBackground）。
     private void saveKeyboardBackground(Uri source) {
         setImportBusy(true, "正在保存键盘背景…");
         importExecutor.execute(() -> {
@@ -827,6 +865,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（clearKeyboardBackground）。
     private void clearKeyboardBackground() {
         try {
             boolean removed = KeyboardBackgroundStore.clear(this);
@@ -836,6 +875,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：处理 requestDirectoryImport 对应的输入并返回或更新相关结果（requestDirectoryImport）。
     private void requestDirectoryImport() {
         if (selectedPack() == null) {
             toast("请先添加并选择一个表情包");
@@ -851,6 +891,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：处理 requestSharedImageAccess 对应的输入并返回或更新相关结果（requestSharedImageAccess）。
     private void requestSharedImageAccess() {
         if (needsLegacyReadPermission()) {
             openDirectoryAfterPermission = false;
@@ -862,6 +903,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：处理 needsLegacyReadPermission 对应的输入并返回或更新相关结果（needsLegacyReadPermission）。
     private boolean needsLegacyReadPermission() {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && Build.VERSION.SDK_INT <= Build.VERSION_CODES.S_V2
@@ -869,6 +911,7 @@ public class MainActivity extends AppCompatActivity {
                 != PackageManager.PERMISSION_GRANTED;
     }
 
+// 方法作用：显示或打开对应的交互界面（openDirectoryPicker）。
     private void openDirectoryPicker() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -881,6 +924,7 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, REQUEST_PICK_DIRECTORY);
     }
 
+// 方法作用：处理 onRequestPermissionsResult 对应的输入并返回或更新相关结果（onRequestPermissionsResult）。
     @Override
     public void onRequestPermissionsResult(
             int requestCode,
@@ -901,6 +945,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：处理外部选择器返回的结果并分派后续操作（onActivityResult）。
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -929,6 +974,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：执行该操作的业务流程并处理结果（runDirectoryImport）。
     private void runDirectoryImport(Uri treeUri, String packId) {
         setImportBusy(true, "正在读取授权目录…");
         importExecutor.execute(() -> {
@@ -946,8 +992,10 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：执行该操作的业务流程并处理结果（runImport）。
     private void runImport(List<Uri> sources, String packId) {
         setImportBusy(true, "正在校验并导入图片…");
+        // 导入和图片解码放到单线程执行器，避免阻塞 Android 主线程导致界面无响应。
         importExecutor.execute(() -> {
             try {
                 showImportResult(EmojiFileStore.importImages(this, sources, packId), packId);
@@ -957,6 +1005,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：显示或打开对应的交互界面（showImportResult）。
     private void showImportResult(EmojiFileStore.BatchImportResult result, String packId) {
         runOnUiThread(() -> {
             if (isFinishing() || isDestroyed()) {
@@ -975,6 +1024,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：显示或打开对应的交互界面（showImportFailure）。
     private void showImportFailure(Exception exception) {
         runOnUiThread(() -> {
             if (isFinishing() || isDestroyed()) {
@@ -985,6 +1035,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+// 方法作用：更新对象状态或注册回调（setImportBusy）。
     private void setImportBusy(boolean busy, String message) {
         importBusy = busy;
         for (Button button : busyControls) {
@@ -1004,6 +1055,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+// 方法作用：显示或打开对应的交互界面（showSettings）。
     private void showSettings() {
         new AlertDialog.Builder(this)
                 .setTitle("设置与导入")
@@ -1042,6 +1094,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showReceiveDiagnostics）。
     private void showReceiveDiagnostics() {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
@@ -1054,12 +1107,14 @@ public class MainActivity extends AppCompatActivity {
         ImageView received = new ImageView(this);
         received.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         input.setListener(new RichContentEditText.Listener() {
+// 方法作用：处理 onImageReceived 对应的输入并返回或更新相关结果（onImageReceived）。
             @Override
             public void onImageReceived(Bitmap bitmap, String mimeType) {
                 received.setImageBitmap(bitmap);
                 result.setText(getString(R.string.local_receive_success, mimeType));
             }
 
+// 方法作用：处理 onImageRejected 对应的输入并返回或更新相关结果（onImageRejected）。
             @Override
             public void onImageRejected(String reason) {
                 result.setText(getString(R.string.local_receive_failure, reason));
@@ -1076,6 +1131,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：显示或打开对应的交互界面（showTextDialog）。
     private void showTextDialog(
             String title,
             String hint,
@@ -1091,6 +1147,7 @@ public class MainActivity extends AppCompatActivity {
                 .show();
     }
 
+// 方法作用：处理 dialogInput 对应的输入并返回或更新相关结果（dialogInput）。
     private EditText dialogInput(String hint, String initial, boolean multiline) {
         EditText input = new EditText(this);
         input.setHint(hint);
@@ -1105,6 +1162,7 @@ public class MainActivity extends AppCompatActivity {
         return input;
     }
 
+// 方法作用：创建匹配父容器尺寸的布局参数（wrapDialogInput）。
     private View wrapDialogInput(EditText input) {
         LinearLayout holder = new LinearLayout(this);
         holder.setPadding(dp(20), 0, dp(20), 0);
@@ -1112,14 +1170,17 @@ public class MainActivity extends AppCompatActivity {
         return holder;
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedGallery）。
     private EmojiCatalog.Gallery selectedGallery() {
         return findGallery(selectedGalleryId);
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedPack）。
     private EmojiCatalog.Pack selectedPack() {
         return catalog == null ? null : catalog.getPack(selectedPackId);
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findGallery）。
     private EmojiCatalog.Gallery findGallery(String galleryId) {
         if (catalog != null && galleryId != null) {
             for (EmojiCatalog.Gallery gallery : catalog.getGalleries()) {
@@ -1131,10 +1192,12 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
+// 方法作用：处理 containsGallery 对应的输入并返回或更新相关结果（containsGallery）。
     private boolean containsGallery(String galleryId) {
         return findGallery(galleryId) != null;
     }
 
+// 方法作用：根据输入条件查询并返回匹配结果（findPack）。
     private static EmojiCatalog.Pack findPack(List<EmojiCatalog.Pack> packs, String packId) {
         if (packId != null) {
             for (EmojiCatalog.Pack pack : packs) {
@@ -1146,11 +1209,13 @@ public class MainActivity extends AppCompatActivity {
         return null;
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedGalleryName）。
     private String selectedGalleryName() {
         EmojiCatalog.Gallery gallery = selectedGallery();
         return gallery == null ? "无图库" : gallery.getName();
     }
 
+// 方法作用：处理 nonEmptyLines 对应的输入并返回或更新相关结果（nonEmptyLines）。
     private static List<String> nonEmptyLines(String text) {
         List<String> result = new ArrayList<>();
         for (String line : text.split("\\r?\\n")) {
@@ -1161,6 +1226,7 @@ public class MainActivity extends AppCompatActivity {
         return result;
     }
 
+// 方法作用：处理 extractUris 对应的输入并返回或更新相关结果（extractUris）。
     private static List<Uri> extractUris(Intent data) {
         List<Uri> sources = new ArrayList<>();
         ClipData clipData = data.getClipData();
@@ -1177,11 +1243,13 @@ public class MainActivity extends AppCompatActivity {
         return sources;
     }
 
+// 方法作用：根据选择状态更新控件的颜色和样式（styleSelection）。
     private void styleSelection(Button button, boolean selected) {
         button.setBackgroundColor(selected ? selectedColor() : railColor());
         button.setTextColor(selected ? selectedTextColor() : primaryTextColor());
     }
 
+// 方法作用：处理 compactButton 对应的输入并返回或更新相关结果（compactButton）。
     private Button compactButton(String text, String description, View.OnClickListener listener) {
         Button button = new Button(this);
         button.setText(text);
@@ -1194,6 +1262,7 @@ public class MainActivity extends AppCompatActivity {
         return button;
     }
 
+// 方法作用：处理 compactLabel 对应的输入并返回或更新相关结果（compactLabel）。
     private TextView compactLabel(String text) {
         TextView label = new TextView(this);
         label.setText(text);
@@ -1203,69 +1272,85 @@ public class MainActivity extends AppCompatActivity {
         return label;
     }
 
+// 方法作用：处理 surfaceColor 对应的输入并返回或更新相关结果（surfaceColor）。
     private int surfaceColor() {
         return isNightMode() ? 0xff121212 : 0xfffafafa;
     }
 
+// 方法作用：处理 railColor 对应的输入并返回或更新相关结果（railColor）。
     private int railColor() {
         return isNightMode() ? 0xff242424 : 0xfff0f1f3;
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedColor）。
     private int selectedColor() {
         return isNightMode() ? 0xff35506f : 0xffdbeafe;
     }
 
+// 方法作用：根据候选条件选择并返回目标项（selectedTextColor）。
     private int selectedTextColor() {
         return isNightMode() ? 0xffffffff : 0xff12345b;
     }
 
+// 方法作用：处理 primaryTextColor 对应的输入并返回或更新相关结果（primaryTextColor）。
     private int primaryTextColor() {
         return isNightMode() ? 0xfff2f2f2 : 0xff202124;
     }
 
+// 方法作用：处理 secondaryTextColor 对应的输入并返回或更新相关结果（secondaryTextColor）。
     private int secondaryTextColor() {
         return isNightMode() ? 0xffb7b7b7 : 0xff686b70;
     }
 
+// 方法作用：判断当前对象是否满足指定条件（isNightMode）。
     private boolean isNightMode() {
         int mask = getResources().getConfiguration().uiMode
                 & android.content.res.Configuration.UI_MODE_NIGHT_MASK;
         return mask == android.content.res.Configuration.UI_MODE_NIGHT_YES;
     }
 
+// 方法作用：在相关数据表示之间进行转换（toast）。
     private void toast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
+// 方法作用：处理 operationFailed 对应的输入并返回或更新相关结果（operationFailed）。
     private void operationFailed(String prefix, Exception exception) {
         toast(prefix + "：" + readableMessage(exception));
     }
 
+// 方法作用：从输入源读取并转换数据（readableMessage）。
     private static String readableMessage(Exception exception) {
         String message = exception.getMessage();
         return message == null || message.trim().isEmpty() ? "未知错误" : message.trim();
     }
 
+// 方法作用：创建匹配父容器尺寸的布局参数（matchWrap）。
     private LinearLayout.LayoutParams matchWrap() {
         return new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
+// 方法作用：创建匹配父容器尺寸的布局参数（wrapMatch）。
     private LinearLayout.LayoutParams wrapMatch() {
         return new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT);
     }
 
+// 方法作用：创建匹配父容器尺寸的布局参数（matchMatch）。
     private FrameLayout.LayoutParams matchMatch() {
         return new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
     }
 
+// 方法作用：处理 dp 对应的输入并返回或更新相关结果（dp）。
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
+// 类作用：定义 TextConsumer，承载所在模块的主要职责。
     private interface TextConsumer {
+// 方法作用：处理 accept 对应的输入并返回或更新相关结果（accept）。
         void accept(String value);
     }
 }

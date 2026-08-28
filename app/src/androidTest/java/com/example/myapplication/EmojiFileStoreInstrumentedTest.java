@@ -24,8 +24,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 
+// 类作用：定义 EmojiFileStoreInstrumentedTest，承载所在模块的主要职责。
 @RunWith(AndroidJUnit4.class)
 public class EmojiFileStoreInstrumentedTest {
+// 方法作用：处理 smallJpegImportsAndPartialFailureKeepsSuccessfulImage 对应的输入并返回或更新相关结果（smallJpegImportsAndPartialFailureKeepsSuccessfulImage）。
     @Test
     public void smallJpegImportsAndPartialFailureKeepsSuccessfulImage() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
@@ -77,6 +79,7 @@ public class EmojiFileStoreInstrumentedTest {
         }
     }
 
+// 方法作用：处理 invalidDirectoryAuthorizationIsReported 对应的输入并返回或更新相关结果（invalidDirectoryAuthorizationIsReported）。
     @Test
     public void invalidDirectoryAuthorizationIsReported() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
@@ -88,6 +91,7 @@ public class EmojiFileStoreInstrumentedTest {
         }
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createJpeg）。
     private static File createJpeg(Context context, String name, int width, int height)
             throws Exception {
         File directory = cacheEmojiDirectory(context);
@@ -102,6 +106,7 @@ public class EmojiFileStoreInstrumentedTest {
         return file;
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createCorruptImage）。
     private static File createCorruptImage(Context context, String name) throws Exception {
         File file = new File(cacheEmojiDirectory(context), name);
         try (FileOutputStream output = new FileOutputStream(file)) {
@@ -110,6 +115,7 @@ public class EmojiFileStoreInstrumentedTest {
         return file;
     }
 
+// 方法作用：处理 cacheEmojiDirectory 对应的输入并返回或更新相关结果（cacheEmojiDirectory）。
     private static File cacheEmojiDirectory(Context context) throws IOException {
         File directory = new File(context.getCacheDir(), "emoji");
         if (!directory.exists() && !directory.mkdirs()) {
@@ -118,6 +124,7 @@ public class EmojiFileStoreInstrumentedTest {
         return directory;
     }
 
+// 方法作用：处理 uriFor 对应的输入并返回或更新相关结果（uriFor）。
     private static Uri uriFor(Context context, File file) {
         return FileProvider.getUriForFile(
                 context,

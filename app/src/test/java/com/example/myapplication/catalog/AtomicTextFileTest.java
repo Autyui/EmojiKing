@@ -14,10 +14,12 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+// 类作用：定义 AtomicTextFileTest，承载所在模块的主要职责。
 public class AtomicTextFileTest {
     @Rule
     public final TemporaryFolder temporaryFolder = new TemporaryFolder();
 
+// 方法作用：将对象转换后写入目标存储（writePersistsUtf8Content）。
     @Test
     public void writePersistsUtf8Content() throws Exception {
         File target = new File(temporaryFolder.newFolder("catalog"), "catalog.json");
@@ -28,6 +30,7 @@ public class AtomicTextFileTest {
         assertEquals("本地表情\n", file.readOrNull());
     }
 
+// 方法作用：处理 failedActivationRestoresPreviousCatalog 对应的输入并返回或更新相关结果（failedActivationRestoresPreviousCatalog）。
     @Test
     public void failedActivationRestoresPreviousCatalog() throws Exception {
         File target = temporaryFolder.newFile("catalog.json");
@@ -48,6 +51,7 @@ public class AtomicTextFileTest {
         }
     }
 
+// 方法作用：从输入源读取并转换数据（readRestoresBackupLeftByInterruptedUpdate）。
     @Test
     public void readRestoresBackupLeftByInterruptedUpdate() throws Exception {
         File directory = temporaryFolder.newFolder("recovery");

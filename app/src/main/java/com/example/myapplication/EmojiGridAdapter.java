@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Fixed-size local thumbnail grid shared by the app and input method. */
+// 类作用：定义 EmojiGridAdapter，承载所在模块的主要职责。
 public final class EmojiGridAdapter extends BaseAdapter {
     private final Context context;
     private final int cellHeight;
@@ -42,6 +43,7 @@ public final class EmojiGridAdapter extends BaseAdapter {
     private boolean refreshScheduled;
     private boolean released;
 
+// 方法作用：初始化 EmojiGridAdapter 对象并建立其运行所需状态。
     public EmojiGridAdapter(Context context, int cellHeightDp, int targetSizeDp) {
         this.context = context;
         this.cellHeight = dp(cellHeightDp);
@@ -50,6 +52,7 @@ public final class EmojiGridAdapter extends BaseAdapter {
                 Integer.MAX_VALUE,
                 Runtime.getRuntime().maxMemory() / 1024L / 16L);
         this.thumbnails = new LruCache<String, Bitmap>(cacheKilobytes) {
+// 方法作用：返回缓存位图占用的内存大小（sizeOf）。
             @Override
             protected int sizeOf(String key, Bitmap bitmap) {
                 return Math.max(1, bitmap.getByteCount() / 1024);
@@ -57,11 +60,13 @@ public final class EmojiGridAdapter extends BaseAdapter {
         };
     }
 
+// 方法作用：更新对象状态或注册回调（setItems）。
     public void setItems(List<EmojiCatalog.Item> items) {
         this.items = new ArrayList<>(items);
         notifyDataSetChanged();
     }
 
+// 方法作用：处理 release 对应的输入并返回或更新相关结果（release）。
     public void release() {
         released = true;
         decodeExecutor.shutdownNow();
@@ -69,6 +74,7 @@ public final class EmojiGridAdapter extends BaseAdapter {
         pendingKeys.clear();
     }
 
+// 方法作用：更新对象状态或注册回调（setSelectionMode）。
     public void setSelectionMode(boolean enabled, Set<String> selectedIds) {
         selectionMode = enabled;
         this.selectedIds = enabled
@@ -77,21 +83,25 @@ public final class EmojiGridAdapter extends BaseAdapter {
         notifyDataSetChanged();
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getCount）。
     @Override
     public int getCount() {
         return items.size();
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getItem）。
     @Override
     public EmojiCatalog.Item getItem(int position) {
         return items.get(position);
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getItemId）。
     @Override
     public long getItemId(int position) {
         return items.get(position).getId().hashCode();
     }
 
+// 方法作用：读取并返回持久化或运行时状态（getView）。
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
         FrameLayout cell = convertView instanceof FrameLayout
@@ -122,6 +132,7 @@ public final class EmojiGridAdapter extends BaseAdapter {
         return cell;
     }
 
+// 方法作用：处理 scheduleThumbnail 对应的输入并返回或更新相关结果（scheduleThumbnail）。
     private void scheduleThumbnail(EmojiCatalog.Item item, String cacheKey) {
         if (released || !pendingKeys.add(cacheKey)) {
             return;
@@ -140,6 +151,7 @@ public final class EmojiGridAdapter extends BaseAdapter {
         });
     }
 
+// 方法作用：处理 completeThumbnail 对应的输入并返回或更新相关结果（completeThumbnail）。
     private void completeThumbnail(String cacheKey, Bitmap bitmap) {
         pendingKeys.remove(cacheKey);
         if (released) {
@@ -164,6 +176,7 @@ public final class EmojiGridAdapter extends BaseAdapter {
         }
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createCell）。
     private FrameLayout createCell() {
         FrameLayout cell = new FrameLayout(context);
         cell.setLayoutParams(new AbsListView.LayoutParams(
@@ -185,6 +198,7 @@ public final class EmojiGridAdapter extends BaseAdapter {
         return cell;
     }
 
+// 方法作用：创建并返回新的业务对象或界面对象（createImageView）。
     private ImageView createImageView() {
         ImageView image = new ImageView(context);
         image.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
@@ -193,6 +207,7 @@ public final class EmojiGridAdapter extends BaseAdapter {
         return image;
     }
 
+// 方法作用：解码输入内容并生成可用对象（decodeThumbnail）。
     private static Bitmap decodeThumbnail(String path, int targetPixels) {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
@@ -210,6 +225,7 @@ public final class EmojiGridAdapter extends BaseAdapter {
         return BitmapFactory.decodeFile(path, options);
     }
 
+// 方法作用：处理 dp 对应的输入并返回或更新相关结果（dp）。
     private int dp(int value) {
         return Math.round(value * context.getResources().getDisplayMetrics().density);
     }

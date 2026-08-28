@@ -7,9 +7,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-/** Small recoverable UTF-8 file store for the catalog manifest. */
+/** 为目录清单提供可恢复的 UTF-8 原子文件存储。 */
+// 类作用：定义 AtomicTextFile，承载所在模块的主要职责。
 final class AtomicTextFile {
+// 类作用：定义 FileMover，承载所在模块的主要职责。
     interface FileMover {
+// 方法作用：处理 move 对应的输入并返回或更新相关结果（move）。
         boolean move(File source, File destination);
     }
 
@@ -71,15 +74,17 @@ final class AtomicTextFile {
 
         if (!mover.move(pending, target)) {
             pending.delete();
+            // 激活失败时恢复旧备份，保证清单不会因中断而丢失。
             if (hadTarget && !mover.move(backup, target)) {
                 throw new IOException("Catalog update failed and backup restoration failed");
             }
             throw new IOException("Cannot activate the new catalog");
         }
-        // The new target is already authoritative; stale backup cleanup is best-effort.
+        // 新文件已经成为权威版本，旧备份的清理只做尽力处理。
         backup.delete();
     }
 
+// 方法作用：处理 recoverIfNeeded 对应的输入并返回或更新相关结果（recoverIfNeeded）。
     private void recoverIfNeeded() throws IOException {
         if (!target.exists() && backup.isFile() && !mover.move(backup, target)) {
             throw new IOException("Cannot restore the catalog backup");
@@ -92,6 +97,7 @@ final class AtomicTextFile {
         }
     }
 
+// 方法作用：删除目标数据并清理相关引用或临时文件（deleteIfPresent）。
     private static void deleteIfPresent(File file, String description) throws IOException {
         if (file.exists() && !file.delete()) {
             throw new IOException("Cannot delete " + description);
