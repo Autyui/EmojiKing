@@ -49,7 +49,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-// 类作用：定义 MainActivity，承载所在模块的主要职责。
+/** 整个应用的主界面功能的实现*/
 public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_PICK_IMAGES = 1001;
     private static final int REQUEST_PICK_DIRECTORY = 1002;

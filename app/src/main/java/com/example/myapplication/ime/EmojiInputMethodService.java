@@ -17,6 +17,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
+import android.widget.AbsListView;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.GridView;
@@ -44,8 +46,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Chinese text keyboard and local emoji browser sharing one fixed input surface. */
-// 类作用：定义 EmojiInputMethodService，承载所在模块的主要职责。
+
+/** 大部分的面板功能实现，包含正常的“富文本”发送通道*/
 public class EmojiInputMethodService extends InputMethodService {
     private static final int CANDIDATE_LIMIT = 15;
     private static final int EXPANDED_CANDIDATE_COLUMNS = 3;
@@ -93,6 +95,9 @@ public class EmojiInputMethodService extends InputMethodService {
     private Bitmap loadedBackgroundBitmap;
     private List<String> currentCandidates = Collections.emptyList();
     private String currentCandidatePinyin = "";
+    private List<String> expandedCandidates = Collections.emptyList();
+    private String expandedCandidatePinyin = "";
+    private boolean expandedCandidatesLoading;
     private boolean chooseFirstPending;
     private boolean candidateExpanded;
 
@@ -183,6 +188,9 @@ public class EmojiInputMethodService extends InputMethodService {
         candidateExpanded = false;
         currentCandidates = Collections.emptyList();
         currentCandidatePinyin = "";
+        expandedCandidates = Collections.emptyList();
+        expandedCandidatePinyin = "";
+        expandedCandidatesLoading = false;
         applySurfaceTheme();
         modeSwitch.setText(textMode ? "☺" : "ABC");
         modeSwitch.setContentDescription(textMode ? "切换到表情图库" : "返回文字键盘");
@@ -662,6 +670,9 @@ public class EmojiInputMethodService extends InputMethodService {
         int generation = ++candidateGeneration;
         currentCandidates = Collections.emptyList();
         currentCandidatePinyin = "";
+        expandedCandidates = Collections.emptyList();
+        expandedCandidatePinyin = "";
+        expandedCandidatesLoading = false;
         candidateStrip.removeAllViews();
         updateCandidateExpandButton(false);
         if (pinyin.isEmpty()) {
@@ -698,6 +709,7 @@ public class EmojiInputMethodService extends InputMethodService {
         renderCandidateButtons(candidates);
         updateCandidateExpandButton(!candidates.isEmpty());
         if (candidateExpanded) {
+            loadExpandedCandidates(pinyin);
             showExpandedCandidatePanel();
         }
         if (chooseFirstPending) {
@@ -749,6 +761,9 @@ public class EmojiInputMethodService extends InputMethodService {
                 && pinyinBuffer.toString().equals(currentCandidatePinyin);
         candidateExpanded = expanded && canExpand;
         updateCandidateExpandButton(canExpand);
+        if (candidateExpanded) {
+            loadExpandedCandidates(currentCandidatePinyin);
+        }
         if (contentContainer == null) {
             return;
         }
@@ -758,6 +773,41 @@ public class EmojiInputMethodService extends InputMethodService {
                 new LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+
+// 方法作用：在后台加载当前完整拼音的全部候选，避免阻塞按键响应。
+    private void loadExpandedCandidates(String pinyin) {
+        if (pinyin == null || pinyin.isEmpty() || pinyinDictionary == null
+                || pinyin.equals(expandedCandidatePinyin)) {
+            return;
+        }
+        int generation = candidateGeneration;
+        expandedCandidatePinyin = pinyin;
+        expandedCandidates = Collections.emptyList();
+        expandedCandidatesLoading = true;
+        dictionaryExecutor.execute(() -> {
+            if (destroyed || generation != candidateGeneration) {
+                return;
+            }
+            List<String> candidates = pinyinDictionary.queryAll(pinyin);
+            mainHandler.post(() -> applyExpandedCandidateResult(
+                    generation, pinyin, candidates));
+        });
+    }
+
+// 方法作用：仅把仍属于当前拼音的全量查询结果应用到展开面板。
+    private void applyExpandedCandidateResult(
+            int generation, String pinyin, List<String> candidates) {
+        if (destroyed || generation != candidateGeneration
+                || !textMode || !pinyin.equals(pinyinBuffer.toString())
+                || !pinyin.equals(expandedCandidatePinyin)) {
+            return;
+        }
+        expandedCandidates = candidates;
+        expandedCandidatesLoading = false;
+        if (candidateExpanded) {
+            showExpandedCandidatePanel();
+        }
     }
 
 // 方法作用：显示或打开对应的交互界面（showExpandedCandidatePanel）。
@@ -772,41 +822,76 @@ public class EmojiInputMethodService extends InputMethodService {
 
 // 方法作用：创建并返回新的业务对象或界面对象（createExpandedCandidatePanel）。
     private View createExpandedCandidatePanel() {
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(dp(6), dp(4), dp(6), dp(4));
-        panel.setBackground(unifiedLetterAreaBackground());
-        int rowCount = (CANDIDATE_LIMIT + EXPANDED_CANDIDATE_COLUMNS - 1)
-                / EXPANDED_CANDIDATE_COLUMNS;
-        for (int rowIndex = 0; rowIndex < rowCount; rowIndex++) {
-            int start = rowIndex * EXPANDED_CANDIDATE_COLUMNS;
-            LinearLayout row = new LinearLayout(this);
-            row.setGravity(Gravity.CENTER_VERTICAL);
-            for (int column = 0; column < EXPANDED_CANDIDATE_COLUMNS; column++) {
-                int index = start + column;
-                if (index < currentCandidates.size()) {
-                    String candidate = currentCandidates.get(index);
-                    Button button = button(candidate, "选择候选词" + candidate,
-                            view -> commitCandidate(candidate));
-                    button.setTextSize(18);
-                    button.setTextColor(primaryTextColor());
-                    button.setSingleLine(true);
-                    button.setEllipsize(TextUtils.TruncateAt.END);
-                    button.setBackground(borderlessKeyBackground());
-                    if (customBackgroundActive) {
-                        button.setShadowLayer(3f, 0f, 1f, Color.BLACK);
-                    }
-                    row.addView(button, new LinearLayout.LayoutParams(
-                            0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-                } else {
-                    row.addView(new View(this), new LinearLayout.LayoutParams(
-                            0, ViewGroup.LayoutParams.MATCH_PARENT, 1f));
-                }
-            }
-            panel.addView(row, new LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
+        if (expandedCandidatesLoading || expandedCandidatePinyin.isEmpty()) {
+            return createExpandedCandidateMessage("正在加载全部候选");
         }
-        return panel;
+        if (expandedCandidates.isEmpty()) {
+            return createExpandedCandidateMessage("无更多候选");
+        }
+
+        List<String> candidates = expandedCandidates;
+        GridView grid = new GridView(this);
+        grid.setNumColumns(EXPANDED_CANDIDATE_COLUMNS);
+        grid.setStretchMode(GridView.STRETCH_COLUMN_WIDTH);
+        grid.setHorizontalSpacing(dp(2));
+        grid.setVerticalSpacing(dp(2));
+        grid.setPadding(dp(6), dp(4), dp(6), dp(4));
+        grid.setClipToPadding(false);
+        grid.setVerticalScrollBarEnabled(true);
+        grid.setBackground(unifiedLetterAreaBackground());
+        grid.setAdapter(new BaseAdapter() {
+            @Override
+            public int getCount() {
+                return candidates.size();
+            }
+
+            @Override
+            public String getItem(int position) {
+                return candidates.get(position);
+            }
+
+            @Override
+            public long getItemId(int position) {
+                return position;
+            }
+
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                Button candidateButton;
+                if (convertView instanceof Button) {
+                    candidateButton = (Button) convertView;
+                } else {
+                    candidateButton = button("", "", null);
+                    candidateButton.setTextSize(18);
+                    candidateButton.setSingleLine(true);
+                    candidateButton.setEllipsize(TextUtils.TruncateAt.END);
+                    candidateButton.setGravity(Gravity.CENTER);
+                    candidateButton.setLayoutParams(new AbsListView.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, dp(50)));
+                }
+                String candidate = getItem(position);
+                candidateButton.setText(candidate);
+                candidateButton.setContentDescription("选择候选词" + candidate);
+                candidateButton.setTextColor(primaryTextColor());
+                candidateButton.setBackground(borderlessKeyBackground());
+                candidateButton.setOnClickListener(view -> commitCandidate(candidate));
+                if (customBackgroundActive) {
+                    candidateButton.setShadowLayer(3f, 0f, 1f, Color.BLACK);
+                } else {
+                    candidateButton.setShadowLayer(0f, 0f, 0f, Color.TRANSPARENT);
+                }
+                return candidateButton;
+            }
+        });
+        return grid;
+    }
+
+// 方法作用：创建展开候选面板的加载状态或空状态。
+    private View createExpandedCandidateMessage(String message) {
+        TextView state = label(message, 14);
+        state.setBackground(unifiedLetterAreaBackground());
+        state.setPadding(dp(12), dp(8), dp(12), dp(8));
+        return state;
     }
 
 // 方法作用：显示或打开对应的交互界面（showCandidateMessage）。
@@ -907,6 +992,9 @@ public class EmojiInputMethodService extends InputMethodService {
             pinyinBuffer.setLength(0);
             currentCandidates = Collections.emptyList();
             currentCandidatePinyin = "";
+            expandedCandidates = Collections.emptyList();
+            expandedCandidatePinyin = "";
+            expandedCandidatesLoading = false;
             if (candidateExpanded) {
                 setCandidateExpanded(false);
             }

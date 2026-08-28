@@ -14,7 +14,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
-/** Owns the versioned catalog and its image files under application-private storage. */
+/** 负责目录清单和 images的读写、缓存、校验和事务性更新。*/
 // 类作用：定义 LocalEmojiCatalogRepository，承载所在模块的主要职责。
 public final class LocalEmojiCatalogRepository {
     public static final String DEFAULT_GALLERY_ID = "gallery-local";

@@ -75,6 +75,7 @@ public class PinyinDictionaryTest {
         PinyinDictionary dictionary = dictionary(entries);
 
         assertEquals(Collections.singletonList("如"), dictionary.query("ru", 15));
+        assertEquals(Collections.singletonList("如"), dictionary.queryAll("ru"));
     }
 
 // 方法作用：根据输入条件查询并返回匹配结果（queryCanReturnFifteenCandidates）。
@@ -87,7 +88,13 @@ public class PinyinDictionaryTest {
         }
         entries.put("houxuan", candidates);
 
-        assertEquals(15, dictionary(entries).query("houxuan", 15).size());
+        PinyinDictionary dictionary = dictionary(entries);
+
+        assertEquals(15, dictionary.query("houxuan", 15).size());
+        assertEquals(20, dictionary.queryAll("houxuan").size());
+        assertEquals(
+                dictionary.query("houxuan", 15),
+                dictionary.queryAll("houxuan").subList(0, 15));
     }
 
 // 方法作用：处理 dictionary 对应的输入并返回或更新相关结果（dictionary）。

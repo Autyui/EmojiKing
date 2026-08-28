@@ -286,6 +286,28 @@ final class PinyinDictionary {
         return result;
     }
 
+// 方法作用：返回当前完整拼音对应的全部候选，供展开候选面板使用。
+    synchronized List<String> queryAll(String pinyin) {
+        String normalized = normalize(pinyin);
+        if (normalized.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        LinkedHashSet<String> candidates = new LinkedHashSet<>();
+        appendAllEntries(candidates, entriesByPinyin.get(normalized), false);
+        List<String> split = splitSyllables(normalized, syllables);
+        if (!split.isEmpty()) {
+            String fallback = composeSingleCharacters(split);
+            if (fallback != null) {
+                candidates.add(fallback);
+            }
+        }
+        if (split.isEmpty()) {
+            appendAllPrefixEntries(candidates, normalized);
+        }
+        return Collections.unmodifiableList(new ArrayList<>(candidates));
+    }
+
     boolean isEmpty() {
         return entriesByPinyin.isEmpty();
     }
@@ -318,6 +340,19 @@ final class PinyinDictionary {
         appendRankedTexts(candidates, best, limit);
     }
 
+// 方法作用：收集拼音前缀下的全部候选，并保持与限量查询一致的排序规则。
+    private void appendAllPrefixEntries(Set<String> candidates, String prefix) {
+        Map<String, Entry> bestByText = new HashMap<>();
+        for (Map.Entry<String, List<Entry>> entry
+                : entriesByPinyin.tailMap(prefix, true).entrySet()) {
+            if (!entry.getKey().startsWith(prefix)) {
+                break;
+            }
+            collectAllBest(bestByText, candidates, entry.getValue(), true);
+        }
+        appendAllRankedTexts(candidates, bestByText, true);
+    }
+
 // 方法作用：向当前拼音缓冲区追加输入并刷新候选（appendEntries）。
     private void appendEntries(Set<String> candidates, List<Entry> entries, int limit) {
         if (entries == null) {
@@ -326,6 +361,44 @@ final class PinyinDictionary {
         List<Entry> best = new ArrayList<>(limit);
         collectBest(best, candidates, entries, limit, false);
         appendRankedTexts(candidates, best, limit);
+    }
+
+// 方法作用：收集指定拼音键下的全部候选，并按动态词频排序和去重。
+    private void appendAllEntries(
+            Set<String> candidates, List<Entry> entries, boolean preferShorter) {
+        if (entries == null) {
+            return;
+        }
+        Map<String, Entry> bestByText = new HashMap<>();
+        collectAllBest(bestByText, candidates, entries, preferShorter);
+        appendAllRankedTexts(candidates, bestByText, preferShorter);
+    }
+
+// 方法作用：为重复文本保留排序更高的词典条目。
+    private void collectAllBest(
+            Map<String, Entry> bestByText,
+            Set<String> existingCandidates,
+            List<Entry> entries,
+            boolean preferShorter) {
+        for (Entry entry : entries) {
+            if (existingCandidates.contains(entry.text)) {
+                continue;
+            }
+            Entry existing = bestByText.get(entry.text);
+            if (existing == null || compareEntries(entry, existing, preferShorter) < 0) {
+                bestByText.put(entry.text, entry);
+            }
+        }
+    }
+
+// 方法作用：把全部候选按既有排序规则追加到结果集合。
+    private void appendAllRankedTexts(
+            Set<String> candidates, Map<String, Entry> bestByText, boolean preferShorter) {
+        List<Entry> ranked = new ArrayList<>(bestByText.values());
+        Collections.sort(ranked, (left, right) -> compareEntries(left, right, preferShorter));
+        for (Entry entry : ranked) {
+            candidates.add(entry.text);
+        }
     }
 
 // 方法作用：向当前拼音缓冲区追加输入并刷新候选（appendRankedTexts）。

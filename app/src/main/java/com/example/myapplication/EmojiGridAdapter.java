@@ -25,9 +25,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-
-/** Fixed-size local thumbnail grid shared by the app and input method. */
-// 类作用：定义 EmojiGridAdapter，承载所在模块的主要职责。
+/**表情网格适配器，把 EmojiCatalog.Item（表情数据）渲染成界面上的一个个格子，并管理图片的异步加载和内存缓存*/
 public final class EmojiGridAdapter extends BaseAdapter {
     private final Context context;
     private final int cellHeight;
@@ -43,7 +41,6 @@ public final class EmojiGridAdapter extends BaseAdapter {
     private boolean refreshScheduled;
     private boolean released;
 
-// 方法作用：初始化 EmojiGridAdapter 对象并建立其运行所需状态。
     public EmojiGridAdapter(Context context, int cellHeightDp, int targetSizeDp) {
         this.context = context;
         this.cellHeight = dp(cellHeightDp);

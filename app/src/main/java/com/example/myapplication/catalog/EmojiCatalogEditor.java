@@ -3,10 +3,9 @@ package com.example.myapplication.catalog;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Rebuilds immutable catalog snapshots for gallery references, packs and items. */
+/** 输入（旧目录 + 修改指令） → 拷贝并修改列表 → 输出（新目录） */
 // 类作用：定义 EmojiCatalogEditor，承载所在模块的主要职责。
 final class EmojiCatalogEditor {
-// 方法作用：初始化 EmojiCatalogEditor 对象并建立其运行所需状态。
     private EmojiCatalogEditor() {
     }
 

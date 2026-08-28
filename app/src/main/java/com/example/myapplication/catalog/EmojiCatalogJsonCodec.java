@@ -14,7 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /** Structured JSON adapter with an in-memory migration from the nested v1 format. */
-// 类作用：定义 EmojiCatalogJsonCodec，承载所在模块的主要职责。
+
 final class EmojiCatalogJsonCodec {
     private final Gson gson = new GsonBuilder()
             .disableHtmlEscaping()

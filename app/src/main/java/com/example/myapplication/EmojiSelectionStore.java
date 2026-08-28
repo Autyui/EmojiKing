@@ -7,7 +7,7 @@ import com.example.myapplication.catalog.EmojiCatalog;
 
 import java.util.List;
 
-/** 持久化应用浏览页与输入法共享的图库和表情包选择。 */
+/** 简易的书签，让在软件和在输入法选择时的处于同一位置 */
 // 类作用：定义 EmojiSelectionStore，承载所在模块的主要职责。
 public final class EmojiSelectionStore {
     private static final String PREFERENCES = "emoji-selection";
